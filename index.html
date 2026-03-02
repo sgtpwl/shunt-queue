@@ -5,26 +5,28 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Shunt Queue - Office</h1>
 
-  <input id="trailer" placeholder="Trailer number">
-  <input id="from" placeholder="From">
-  <input id="to" placeholder="To">
+<h1>Shunt Queue - Office</h1>
 
-  <select id="type">
-    <option>Move Trailer</option>
-    <option>Provide Power (DD)</option>
-    <option>Remove Power (DD)</option>
-  </select>
+<input id="trailer" placeholder="Trailer number">
+<input id="from" placeholder="From">
+<input id="to" placeholder="To">
 
-  <button onclick="addTask()">Add Task</button>
+<select id="type">
+  <option>Move Trailer</option>
+  <option>Provide Power (DD)</option>
+  <option>Remove Power (DD)</option>
+</select>
 
-  <h2>Queue</h2>
-  <div id="tasks"></div>
+<button onclick="addTask()">Add Task</button>
 
-  <script src="config.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-  <script src="app.js"></script>
+<h2>Queue</h2>
+<div id="tasks"></div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+
 </body>
 </html>
