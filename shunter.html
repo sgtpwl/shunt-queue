@@ -8,34 +8,47 @@
 
 <h1>Next Task</h1>
 
-<div id="nextTask"></div>
+<div id="nextTask">Loading...</div>
 
-<script src="config.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="config.js"></script>
 
 <script>
-db.ref("tasks").orderByChild("status").equalTo("waiting").limitToFirst(1)
-.on("value", snapshot => {
+function loadNextTask() {
 
-  const taskDiv = document.getElementById("nextTask");
-  taskDiv.innerHTML = "";
+  db.ref("tasks").on("value", snapshot => {
 
-  snapshot.forEach(child => {
+    const taskDiv = document.getElementById("nextTask");
+    taskDiv.innerHTML = "";
 
-    const task = child.val();
+    let firstTask = null;
+
+    snapshot.forEach(child => {
+      if (!firstTask) {
+        firstTask = child.val();
+      }
+    });
+
+    if (!firstTask) {
+      taskDiv.innerHTML = "No tasks waiting";
+      return;
+    }
 
     taskDiv.innerHTML = `
       <div class="task">
-        <h2>${task.trailer}</h2>
-        <p>${task.type}</p>
-        <p>${task.from || ""} ${task.to ? "→ " + task.to : ""}</p>
+        <h2>${firstTask.trailer}</h2>
+        <p>${firstTask.type}</p>
+        <p>${firstTask.from || ""} ${firstTask.to ? "→ " + firstTask.to : ""}</p>
+        <p><b>Status:</b> ${firstTask.status}</p>
       </div>
     `;
 
   });
 
-});
+}
+
+window.onload = loadNextTask;
 </script>
 
 </body>
