@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Shunt Queue - Office</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Shunt Queue - Office</h1>
+
+  <input id="trailer" placeholder="Trailer number">
+  <input id="from" placeholder="From">
+  <input id="to" placeholder="To">
+
+  <select id="type">
+    <option>Move Trailer</option>
+    <option>Provide Power (DD)</option>
+    <option>Remove Power (DD)</option>
+  </select>
+
+  <button onclick="addTask()">Add Task</button>
+
+  <h2>Queue</h2>
+  <div id="tasks"></div>
+
+  <script src="config.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
