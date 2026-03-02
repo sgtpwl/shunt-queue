@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Shunt Queue - Shunter</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>Next Task</h1>
+
+<div id="nextTask"></div>
+
+<script src="config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<script>
+db.ref("tasks").orderByChild("status").equalTo("waiting").limitToFirst(1)
+.on("value", snapshot => {
+
+  const taskDiv = document.getElementById("nextTask");
+  taskDiv.innerHTML = "";
+
+  snapshot.forEach(child => {
+
+    const task = child.val();
+
+    taskDiv.innerHTML = `
+      <div class="task">
+        <h2>${task.trailer}</h2>
+        <p>${task.type}</p>
+        <p>${task.from || ""} ${task.to ? "→ " + task.to : ""}</p>
+      </div>
+    `;
+
+  });
+
+});
+</script>
+
+</body>
+</html>
