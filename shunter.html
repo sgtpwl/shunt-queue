@@ -3,6 +3,7 @@
 <head>
   <title>Shunt Queue - Shunter</title>
   <link rel="stylesheet" href="style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
 
@@ -45,7 +46,7 @@ function completeTask(id) {
 
 function loadNextTask() {
 
-  db.ref("tasks").orderByChild("created").limitToFirst(1)
+  db.ref("tasks").orderByChild("created")
   .on("value", function(snapshot) {
 
     const taskDiv = document.getElementById("nextTask");
@@ -55,40 +56,32 @@ function loadNextTask() {
     let task = null;
 
     snapshot.forEach(function(child) {
-      taskId = child.key;
-      task = child.val();
+      const t = child.val();
+
+      // FIFO: first waiting task only
+      if (!task && t.status === "waiting") {
+        taskId = child.key;
+        task = t;
+      }
     });
 
     if (!task) {
-      taskDiv.innerHTML = "No tasks waiting";
+      taskDiv.innerHTML = "<div class='task'>No tasks waiting</div>";
       return;
-    }
-
-    let buttons = "";
-
-    if (task.status === "waiting") {
-      buttons = `<button onclick="acceptTask('${taskId}')">ACCEPT</button>`;
-    } else {
-      buttons = `<button onclick="completeTask('${taskId}')">COMPLETE</button>`;
     }
 
     taskDiv.innerHTML = `
       <div class="task">
         <h2>${task.trailer}</h2>
-        <p>${task.type}</p>
+        <p><strong>${task.type}</strong></p>
         <p>${task.from || ""} ${task.to ? "→ " + task.to : ""}</p>
-        <p><b>Status:</b> ${task.status}</p>
-        ${task.acceptedBy ? `<p><b>Accepted by:</b> ${task.acceptedBy}</p>` : ""}
-        ${buttons}
+        <button onclick="acceptTask('${taskId}')">ACCEPT</button>
       </div>
     `;
-
   });
-
 }
 
 window.onload = loadNextTask;
-
 </script>
 
 </body>
