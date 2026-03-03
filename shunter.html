@@ -10,7 +10,6 @@
 <h1>Next Task</h1>
 <div id="nextTask">Loading...</div>
 
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -49,6 +48,7 @@ function loadNextTask() {
   db.ref("tasks").orderByChild("created")
   .on("value", function(snapshot) {
 
+    const vehicle = getVehicle();
     const taskDiv = document.getElementById("nextTask");
     taskDiv.innerHTML = "";
 
@@ -58,7 +58,13 @@ function loadNextTask() {
     snapshot.forEach(function(child) {
       const t = child.val();
 
-      // FIFO: first waiting task only
+      // If task already accepted by THIS vehicle
+      if (!task && t.status === "accepted" && t.acceptedBy === vehicle) {
+        taskId = child.key;
+        task = t;
+      }
+
+      // Otherwise show first waiting job
       if (!task && t.status === "waiting") {
         taskId = child.key;
         task = t;
@@ -70,12 +76,24 @@ function loadNextTask() {
       return;
     }
 
+    let button = "";
+
+    if (task.status === "waiting") {
+      button = `<button onclick="acceptTask('${taskId}')">ACCEPT</button>`;
+    }
+
+    if (task.status === "accepted" && task.acceptedBy === vehicle) {
+      button = `<button onclick="completeTask('${taskId}')">COMPLETE</button>`;
+    }
+
     taskDiv.innerHTML = `
       <div class="task">
         <h2>${task.trailer}</h2>
         <p><strong>${task.type}</strong></p>
         <p>${task.from || ""} ${task.to ? "→ " + task.to : ""}</p>
-        <button onclick="acceptTask('${taskId}')">ACCEPT</button>
+        <p>Status: ${task.status}</p>
+        ${task.acceptedBy ? `<p>Accepted by: ${task.acceptedBy}</p>` : ""}
+        ${button}
       </div>
     `;
   });
