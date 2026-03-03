@@ -1,24 +1,14 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Shunt Queue - Shunter</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-
-<h1>Next Task</h1>
-
-<div id="nextTask">Loading...</div>
-
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-<script src="config.js"></script>
-
 <script>
+
+function getVehicle() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("vehicle") || "Unknown";
+}
 
 function acceptTask(id) {
   db.ref("tasks/" + id).update({
-    status: "accepted"
+    status: "accepted",
+    acceptedBy: getVehicle()
   });
 }
 
@@ -53,6 +43,7 @@ function loadNextTask() {
         <p>${task.type}</p>
         <p>${task.from || ""} ${task.to ? "→ " + task.to : ""}</p>
         <p><b>Status:</b> ${task.status}</p>
+        ${task.acceptedBy ? `<p><b>Accepted by:</b> ${task.acceptedBy}</p>` : ""}
 
         ${task.status === "waiting"
           ? `<button onclick="acceptTask('${taskId}')">ACCEPT</button>`
@@ -68,6 +59,3 @@ function loadNextTask() {
 window.onload = loadNextTask;
 
 </script>
-
-</body>
-</html>
