@@ -52,50 +52,65 @@ function loadNextTask() {
     const taskDiv = document.getElementById("nextTask");
     taskDiv.innerHTML = "";
 
-    let taskId = null;
-    let task = null;
+    let acceptedTask = null;
+    let acceptedId = null;
+
+    let waitingTask = null;
+    let waitingId = null;
 
     snapshot.forEach(function(child) {
+
       const t = child.val();
 
-      // If task already accepted by THIS vehicle
-      if (!task && t.status === "accepted" && t.acceptedBy === vehicle) {
-        taskId = child.key;
-        task = t;
+      // PRIORITY 1: job already accepted by this vehicle
+      if (!acceptedTask && t.status === "accepted" && t.acceptedBy === vehicle) {
+        acceptedTask = t;
+        acceptedId = child.key;
       }
 
-      // Otherwise show first waiting job
-      if (!task && t.status === "waiting") {
-        taskId = child.key;
-        task = t;
+      // PRIORITY 2: first waiting job
+      if (!waitingTask && t.status === "waiting") {
+        waitingTask = t;
+        waitingId = child.key;
       }
+
     });
 
-    if (!task) {
-      taskDiv.innerHTML = "<div class='task'>No tasks waiting</div>";
+    // Show accepted job first
+    if (acceptedTask) {
+
+      taskDiv.innerHTML = `
+        <div class="task">
+          <h2>${acceptedTask.trailer}</h2>
+          <p><strong>${acceptedTask.type}</strong></p>
+          <p>${acceptedTask.from || ""} ${acceptedTask.to ? "→ " + acceptedTask.to : ""}</p>
+          <p><strong>Status:</strong> accepted</p>
+          <p><strong>Accepted by:</strong> ${vehicle}</p>
+          <button onclick="completeTask('${acceptedId}')">COMPLETE</button>
+        </div>
+      `;
+
       return;
     }
 
-    let button = "";
+    // Otherwise show next waiting job
+    if (waitingTask) {
 
-    if (task.status === "waiting") {
-      button = `<button onclick="acceptTask('${taskId}')">ACCEPT</button>`;
+      taskDiv.innerHTML = `
+        <div class="task">
+          <h2>${waitingTask.trailer}</h2>
+          <p><strong>${waitingTask.type}</strong></p>
+          <p>${waitingTask.from || ""} ${waitingTask.to ? "→ " + waitingTask.to : ""}</p>
+          <p><strong>Status:</strong> waiting</p>
+          <button onclick="acceptTask('${waitingId}')">ACCEPT</button>
+        </div>
+      `;
+
+      return;
     }
 
-    if (task.status === "accepted" && task.acceptedBy === vehicle) {
-      button = `<button onclick="completeTask('${taskId}')">COMPLETE</button>`;
-    }
+    taskDiv.innerHTML = "<div class='task'>No tasks waiting</div>";
 
-    taskDiv.innerHTML = `
-      <div class="task">
-        <h2>${task.trailer}</h2>
-        <p><strong>${task.type}</strong></p>
-        <p>${task.from || ""} ${task.to ? "→ " + task.to : ""}</p>
-        <p>Status: ${task.status}</p>
-        ${task.acceptedBy ? `<p>Accepted by: ${task.acceptedBy}</p>` : ""}
-        ${button}
-      </div>
-    `;
   });
 }
 
