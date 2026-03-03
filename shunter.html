@@ -1,3 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Shunt Queue - Shunter</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>Next Task</h1>
+<div id="nextTask">Loading...</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="config.js"></script>
+
 <script>
 
 function getVehicle() {
@@ -19,7 +34,7 @@ function completeTask(id) {
 function loadNextTask() {
 
   db.ref("tasks").orderByChild("created").limitToFirst(1)
-  .on("value", snapshot => {
+  .on("value", function(snapshot) {
 
     const taskDiv = document.getElementById("nextTask");
     taskDiv.innerHTML = "";
@@ -27,7 +42,7 @@ function loadNextTask() {
     let taskId = null;
     let task = null;
 
-    snapshot.forEach(child => {
+    snapshot.forEach(function(child) {
       taskId = child.key;
       task = child.val();
     });
@@ -37,6 +52,14 @@ function loadNextTask() {
       return;
     }
 
+    let buttons = "";
+
+    if (task.status === "waiting") {
+      buttons = `<button onclick="acceptTask('${taskId}')">ACCEPT</button>`;
+    } else {
+      buttons = `<button onclick="completeTask('${taskId}')">COMPLETE</button>`;
+    }
+
     taskDiv.innerHTML = `
       <div class="task">
         <h2>${task.trailer}</h2>
@@ -44,11 +67,7 @@ function loadNextTask() {
         <p>${task.from || ""} ${task.to ? "→ " + task.to : ""}</p>
         <p><b>Status:</b> ${task.status}</p>
         ${task.acceptedBy ? `<p><b>Accepted by:</b> ${task.acceptedBy}</p>` : ""}
-
-        ${task.status === "waiting"
-          ? `<button onclick="acceptTask('${taskId}')">ACCEPT</button>`
-          : `<button onclick="completeTask('${taskId}')">COMPLETE</button>`
-        }
+        ${buttons}
       </div>
     `;
 
@@ -59,3 +78,6 @@ function loadNextTask() {
 window.onload = loadNextTask;
 
 </script>
+
+</body>
+</html>
