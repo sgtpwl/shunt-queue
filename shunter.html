@@ -57,8 +57,7 @@ db.ref("tasks/"+id).remove();
 
 function loadNextTask(){
 
-db.ref("tasks").orderByChild("created")
-.on("value",function(snapshot){
+db.ref("tasks").on("value",function(snapshot){
 
 const shunter=getShunter();
 const taskDiv=document.getElementById("nextTask");
@@ -67,27 +66,21 @@ taskDiv.innerHTML="";
 let myTask=null;
 let myTaskId=null;
 
-let nextTask=null;
-let nextTaskId=null;
+let firstWaiting=null;
+let firstWaitingId=null;
 
 snapshot.forEach(function(child){
 
-const t=child.val();
+const task=child.val();
 
-if(!myTask && t.status==="accepted" && t.acceptedBy===shunter){
-myTask=t;
+if(task.status==="accepted" && task.acceptedBy===shunter && !myTask){
+myTask=task;
 myTaskId=child.key;
 }
 
-});
-
-snapshot.forEach(function(child){
-
-const t=child.val();
-
-if(!nextTask && t.status==="waiting"){
-nextTask=t;
-nextTaskId=child.key;
+if(task.status==="waiting" && !firstWaiting){
+firstWaiting=task;
+firstWaitingId=child.key;
 }
 
 });
@@ -106,14 +99,14 @@ taskDiv.innerHTML=`
 return;
 }
 
-if(nextTask){
+if(firstWaiting){
 
 taskDiv.innerHTML=`
 <div class="task">
-<h2 style="font-size:40px;">${nextTask.trailer}</h2>
-<p style="font-size:28px;"><strong>${nextTask.type}</strong></p>
-<p style="font-size:24px;">${nextTask.from || ""} ${nextTask.to ? "→ "+nextTask.to : ""}</p>
-<button onclick="acceptTask('${nextTaskId}')" style="width:90%;height:80px;font-size:28px;">ACCEPT</button>
+<h2 style="font-size:40px;">${firstWaiting.trailer}</h2>
+<p style="font-size:28px;"><strong>${firstWaiting.type}</strong></p>
+<p style="font-size:24px;">${firstWaiting.from || ""} ${firstWaiting.to ? "→ "+firstWaiting.to : ""}</p>
+<button onclick="acceptTask('${firstWaitingId}')" style="width:90%;height:80px;font-size:28px;">ACCEPT</button>
 </div>
 `;
 
