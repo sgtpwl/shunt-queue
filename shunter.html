@@ -45,10 +45,19 @@ return localStorage.getItem("shunterName");
 }
 
 function acceptTask(id){
-db.ref("tasks/"+id).update({
-status:"accepted",
-acceptedBy:getShunter()
+
+db.ref("tasks/"+id).transaction(task => {
+
+if(task && task.status === "waiting"){
+task.status = "accepted";
+task.acceptedBy = getShunter();
+return task;
+}
+
+return;
+
 });
+
 }
 
 function completeTask(id){
@@ -57,72 +66,71 @@ db.ref("tasks/"+id).remove();
 
 function loadNextTask(){
 
-db.ref("tasks").on("value",function(snapshot){
+db.ref("tasks").on("value",snapshot=>{
 
 const shunter=getShunter();
 const taskDiv=document.getElementById("nextTask");
-taskDiv.innerHTML="";
 
 let tasks=[];
 
-snapshot.forEach(function(child){
-let t=child.val();
-t.id=child.key;
-tasks.push(t);
+snapshot.forEach(child=>{
+let task=child.val();
+task.id=child.key;
+tasks.push(task);
 });
 
 tasks.sort((a,b)=>a.created-b.created);
 
-// FIRST: check if this shunter already has a job
-let myTask=tasks.find(t => t.status==="accepted" && t.acceptedBy===shunter);
+// show my active job
+let myTask = tasks.find(t=>t.status==="accepted" && t.acceptedBy===shunter);
 
 if(myTask){
 
 taskDiv.innerHTML=`
 <div class="task">
-<h2 style="font-size:40px;">${myTask.trailer}</h2>
-<p style="font-size:28px;"><strong>${myTask.type}</strong></p>
-<p style="font-size:24px;">${myTask.from || ""} ${myTask.to ? "→ "+myTask.to : ""}</p>
-<button onclick="completeTask('${myTask.id}')" style="width:90%;height:80px;font-size:28px;">COMPLETE</button>
+<h2 style="font-size:40px">${myTask.trailer}</h2>
+<p style="font-size:28px"><strong>${myTask.type}</strong></p>
+<p style="font-size:24px">${myTask.from||""} ${myTask.to?"→ "+myTask.to:""}</p>
+<button onclick="completeTask('${myTask.id}')" style="width:90%;height:80px;font-size:28px">COMPLETE</button>
 </div>
 `;
 
 return;
 }
 
-// SECOND: find first job nobody has accepted
-let nextTask=tasks.find(t => t.status==="waiting");
+// otherwise show next waiting job
+let next = tasks.find(t=>t.status==="waiting");
 
-if(nextTask){
+if(next){
 
 taskDiv.innerHTML=`
 <div class="task">
-<h2 style="font-size:40px;">${nextTask.trailer}</h2>
-<p style="font-size:28px;"><strong>${nextTask.type}</strong></p>
-<p style="font-size:24px;">${nextTask.from || ""} ${nextTask.to ? "→ "+nextTask.to : ""}</p>
-<button onclick="acceptTask('${nextTask.id}')" style="width:90%;height:80px;font-size:28px;">ACCEPT</button>
+<h2 style="font-size:40px">${next.trailer}</h2>
+<p style="font-size:28px"><strong>${next.type}</strong></p>
+<p style="font-size:24px">${next.from||""} ${next.to?"→ "+next.to:""}</p>
+<button onclick="acceptTask('${next.id}')" style="width:90%;height:80px;font-size:28px">ACCEPT</button>
 </div>
 `;
 
 return;
 }
 
-taskDiv.innerHTML="<div class='task'>No tasks waiting</div>";
+taskDiv.innerHTML="No tasks waiting";
 
 });
 
 }
 
-window.onload=function(){
+window.onload=()=>{
 
-const shunter=getShunter();
+const name=getShunter();
 
-if(!shunter){
+if(!name){
 window.location.href="shunter-login.html";
 return;
 }
 
-document.getElementById("shunterName").innerText="Shunter: "+shunter;
+document.getElementById("shunterName").innerText="Shunter: "+name;
 
 loadNextTask();
 
