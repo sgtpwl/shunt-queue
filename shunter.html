@@ -3,18 +3,24 @@
 <head>
 
 <title>Shunter Tasks</title>
-
 <link rel="stylesheet" href="style.css">
-
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 </head>
 
 <body>
 
-<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;">
+<div style="display:flex;justify-content:space-between;padding:10px;">
+
 <h2 id="shunterName"></h2>
-<button onclick="logout()">Logout</button>
+
+<div>
+
+<button onclick="setBreak()">Break</button>
+<button onclick="endShift()">End Shift</button>
+
+</div>
+
 </div>
 
 <h1 style="text-align:center;">Task</h1>
@@ -28,24 +34,53 @@
 
 <script>
 
-function logout(){
-localStorage.removeItem("shunterName");
-window.location.href="shunter-login.html";
-}
-
 function getShunter(){
 return localStorage.getItem("shunterName");
 }
 
+function endShift(){
+
+const name=getShunter();
+
+db.ref("shunters/"+name).remove();
+
+localStorage.removeItem("shunterName");
+
+window.location.href="shunter-login.html";
+
+}
+
+function setBreak(){
+
+const name=getShunter();
+
+db.ref("shunters/"+name).update({
+status:"break"
+});
+
+}
+
 function acceptTask(id){
+
 db.ref("tasks/"+id).update({
 status:"accepted",
 acceptedBy:getShunter()
 });
+
+db.ref("shunters/"+getShunter()).update({
+status:"busy"
+});
+
 }
 
 function completeTask(id){
+
 db.ref("tasks/"+id).remove();
+
+db.ref("shunters/"+getShunter()).update({
+status:"available"
+});
+
 }
 
 function connectPower(task){
@@ -55,11 +90,14 @@ const shunter=getShunter();
 db.ref("powerConnections/"+shunter).set({
 trailer:task.trailer,
 bay:task.bay,
-status:"connected",
-connectedAt:Date.now()
+status:"connected"
 });
 
 db.ref("tasks/"+task.id).remove();
+
+db.ref("shunters/"+shunter).update({
+status:"power"
+});
 
 }
 
@@ -68,6 +106,10 @@ function acknowledgePower(){
 const shunter=getShunter();
 
 db.ref("powerConnections/"+shunter).remove();
+
+db.ref("shunters/"+shunter).update({
+status:"available"
+});
 
 }
 
@@ -112,7 +154,6 @@ return;
 div.innerHTML=`
 <h2>${myTask.trailer}</h2>
 <p>${myTask.type}</p>
-<p>${myTask.from||""} ${myTask.to?"→ "+myTask.to:""}</p>
 
 <button onclick="completeTask('${myTask.id}')"
 style="width:90%;height:80px;font-size:28px">
@@ -131,8 +172,6 @@ if(nextTask){
 div.innerHTML=`
 <h2>${nextTask.trailer}</h2>
 <p>${nextTask.type}</p>
-<p>${nextTask.bay ? "Bay "+nextTask.bay : ""}</p>
-<p>${nextTask.from||""} ${nextTask.to?"→ "+nextTask.to:""}</p>
 
 <button onclick="acceptTask('${nextTask.id}')"
 style="width:90%;height:80px;font-size:28px">
@@ -166,9 +205,8 @@ if(power.status==="connected"){
 
 document.getElementById("screen").innerHTML=`
 <h2>⚡ POWER CONNECTED</h2>
-<p>Trailer: ${power.trailer}</p>
-<p>Bay: ${power.bay}</p>
-<p>Waiting for supervisor</p>
+<p>${power.trailer}</p>
+<p>Bay ${power.bay}</p>
 `;
 
 return;
@@ -179,8 +217,6 @@ if(power.status==="readyToDisconnect"){
 
 document.getElementById("screen").innerHTML=`
 <h2>POWER COMPLETE</h2>
-<p>${power.trailer}</p>
-<p>Bay ${power.bay}</p>
 
 <button onclick="acknowledgePower()"
 style="width:90%;height:80px;font-size:28px">
@@ -208,6 +244,10 @@ if(!shunter){
 window.location.href="shunter-login.html";
 return;
 }
+
+db.ref("shunters/"+shunter).set({
+status:"available"
+});
 
 start();
 
