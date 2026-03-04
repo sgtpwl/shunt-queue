@@ -13,9 +13,9 @@
 <button onclick="logout()">Logout</button>
 </div>
 
-<h1 style="text-align:center;">Next Task</h1>
+<h1 style="text-align:center;">Task</h1>
 
-<div id="nextTask" style="padding:20px;text-align:center;">Loading...</div>
+<div id="screen" style="padding:20px;text-align:center;">Loading...</div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -45,24 +45,67 @@ db.ref("tasks/"+id).remove();
 
 function connectPower(task){
 
-const shunter = getShunter();
+const shunter=getShunter();
 
 db.ref("powerConnections/"+shunter).set({
-trailer: task.trailer,
-bay: task.bay,
-connectedAt: Date.now()
+trailer:task.trailer,
+bay:task.bay,
+status:"connected",
+connectedAt:Date.now()
 });
 
 db.ref("tasks/"+task.id).remove();
 
 }
 
-function loadNextTask(){
-
-db.ref("tasks").on("value",function(snapshot){
+function disconnectPower(){
 
 const shunter=getShunter();
-const taskDiv=document.getElementById("nextTask");
+
+db.ref("powerConnections/"+shunter).remove();
+
+}
+
+function showConnected(power){
+
+const div=document.getElementById("screen");
+
+if(power.status==="connected"){
+
+div.innerHTML=`
+<h2>⚡ POWER CONNECTED</h2>
+<p>Trailer: ${power.trailer}</p>
+<p>Bay: ${power.bay}</p>
+<p>Waiting for supervisor</p>
+`;
+
+return;
+
+}
+
+if(power.status==="readyToDisconnect"){
+
+div.innerHTML=`
+<h2>REMOVE POWER</h2>
+<p>${power.trailer}</p>
+<p>Bay ${power.bay}</p>
+
+<button onclick="disconnectPower()"
+style="width:90%;height:80px;font-size:28px">
+DISCONNECTED
+</button>
+`;
+
+}
+
+}
+
+function loadTasks(){
+
+db.ref("tasks").on("value",snapshot=>{
+
+const shunter=getShunter();
+const div=document.getElementById("screen");
 
 let tasks=[];
 
@@ -80,57 +123,81 @@ if(myTask){
 
 if(myTask.type==="Provide Power (DD)"){
 
-taskDiv.innerHTML=`
-<div class="task">
+div.innerHTML=`
 <h2>${myTask.trailer}</h2>
 <p>Provide Power</p>
 <p>Bay ${myTask.bay}</p>
+
 <button onclick='connectPower(${JSON.stringify(myTask)})'
 style="width:90%;height:80px;font-size:28px">
 CONNECTED
 </button>
-</div>
 `;
 
 return;
+
 }
 
-taskDiv.innerHTML=`
-<div class="task">
+div.innerHTML=`
 <h2>${myTask.trailer}</h2>
 <p>${myTask.type}</p>
 <p>${myTask.from||""} ${myTask.to?"→ "+myTask.to:""}</p>
+
 <button onclick="completeTask('${myTask.id}')"
 style="width:90%;height:80px;font-size:28px">
 COMPLETE
 </button>
-</div>
 `;
 
 return;
+
 }
 
 let nextTask=tasks.find(t=>t.status==="waiting");
 
 if(nextTask){
 
-taskDiv.innerHTML=`
-<div class="task">
+div.innerHTML=`
 <h2>${nextTask.trailer}</h2>
 <p>${nextTask.type}</p>
 <p>${nextTask.bay ? "Bay "+nextTask.bay : ""}</p>
 <p>${nextTask.from||""} ${nextTask.to?"→ "+nextTask.to:""}</p>
+
 <button onclick="acceptTask('${nextTask.id}')"
 style="width:90%;height:80px;font-size:28px">
 ACCEPT
 </button>
-</div>
 `;
 
 return;
+
 }
 
-taskDiv.innerHTML="No tasks waiting";
+div.innerHTML="No tasks waiting";
+
+});
+
+}
+
+function start(){
+
+const shunter=getShunter();
+
+document.getElementById("shunterName").innerText="Shunter: "+shunter;
+
+db.ref("powerConnections/"+shunter).on("value",snap=>{
+
+const power=snap.val();
+
+if(power){
+
+showConnected(power);
+
+}else{
+
+loadTasks();
+
+}
 
 });
 
@@ -145,9 +212,7 @@ window.location.href="shunter-login.html";
 return;
 }
 
-document.getElementById("shunterName").innerText="Shunter: "+shunter;
-
-loadNextTask();
+start();
 
 }
 
