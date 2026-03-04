@@ -33,7 +33,7 @@ function addTask(button) {
 
       setTimeout(() => {
         button.disabled = false;
-        button.innerText = "Add Task";
+        button.innerText = "Submit Task";
       }, 1500);
 
     });
@@ -41,6 +41,7 @@ function addTask(button) {
   });
 
 }
+
 
 function moveUp(id){
 
@@ -70,6 +71,7 @@ function moveUp(id){
 
 }
 
+
 function moveDown(id){
 
   db.ref("tasks").once("value", snapshot=>{
@@ -98,6 +100,7 @@ function moveDown(id){
 
 }
 
+
 function finishPower(shunter, button){
 
   button.disabled = true;
@@ -113,13 +116,14 @@ function finishPower(shunter, button){
 
 }
 
+
 function loadTasks() {
 
+  const tasksDiv = document.getElementById("tasks");
+
+  if(!tasksDiv) return;
+
   db.ref("tasks").on("value", snapshot => {
-
-    const tasksDiv = document.getElementById("tasks");
-
-    if(!tasksDiv) return;
 
     tasksDiv.innerHTML = "";
 
@@ -159,6 +163,7 @@ function loadTasks() {
 
 }
 
+
 function loadPowerConnections(){
 
   const div=document.getElementById("powerConnections");
@@ -194,70 +199,79 @@ function loadPowerConnections(){
 
 }
 
+
 function loadShunterStatus(){
 
   const div=document.getElementById("shunterStatus");
 
   if(!div) return;
 
-  db.ref("powerConnections").on("value",snapshot=>{
+  function refresh(){
 
-    let power={};
+    db.ref("powerConnections").once("value", powerSnap=>{
 
-    snapshot.forEach(child=>{
-      power[child.key]=child.val();
-    });
+      let power={};
 
-    db.ref("tasks").on("value",taskSnap=>{
-
-      let busy={};
-
-      taskSnap.forEach(child=>{
-        const t=child.val();
-        if(t.status==="accepted"){
-          busy[t.acceptedBy]=t;
-        }
+      powerSnap.forEach(child=>{
+        power[child.key]=child.val();
       });
 
-      div.innerHTML="";
+      db.ref("tasks").once("value", taskSnap=>{
 
-      const shunters=new Set([
-        ...Object.keys(power),
-        ...Object.keys(busy)
-      ]);
+        let busy={};
 
-      if(shunters.size===0){
-        div.innerHTML="No active shunters";
-        return;
-      }
+        taskSnap.forEach(child=>{
+          const t=child.val();
+          if(t.status==="accepted"){
+            busy[t.acceptedBy]=t;
+          }
+        });
 
-      shunters.forEach(name=>{
+        div.innerHTML="";
 
-        const row=document.createElement("div");
+        const shunters=new Set([
+          ...Object.keys(power),
+          ...Object.keys(busy)
+        ]);
 
-        if(power[name]){
-
-          row.innerHTML=`${name} — ⚡ Power ${power[name].bay}`;
-
-        }else if(busy[name]){
-
-          row.innerHTML=`${name} — Moving ${busy[name].trailer}`;
-
-        }else{
-
-          row.innerHTML=`${name} — Available`;
-
+        if(shunters.size===0){
+          div.innerHTML="No active shunters";
+          return;
         }
 
-        div.appendChild(row);
+        shunters.forEach(name=>{
+
+          const row=document.createElement("div");
+
+          if(power[name]){
+
+            row.innerHTML=`${name} — ⚡ Power ${power[name].bay}`;
+
+          }else if(busy[name]){
+
+            row.innerHTML=`${name} — Moving ${busy[name].trailer}`;
+
+          }else{
+
+            row.innerHTML=`${name} — Available`;
+
+          }
+
+          div.appendChild(row);
+
+        });
 
       });
 
     });
 
-  });
+  }
+
+  db.ref("tasks").on("value", refresh);
+  db.ref("powerConnections").on("value", refresh);
 
 }
+
 
 window.onload=function(){
 
