@@ -33,7 +33,7 @@ function addTask(button) {
 
       setTimeout(() => {
         button.disabled = false;
-        button.innerText = "Submit Task";
+        button.innerText = "Add Task";
       }, 1500);
 
     });
@@ -194,9 +194,75 @@ function loadPowerConnections(){
 
 }
 
+function loadShunterStatus(){
+
+  const div=document.getElementById("shunterStatus");
+
+  if(!div) return;
+
+  db.ref("powerConnections").on("value",snapshot=>{
+
+    let power={};
+
+    snapshot.forEach(child=>{
+      power[child.key]=child.val();
+    });
+
+    db.ref("tasks").on("value",taskSnap=>{
+
+      let busy={};
+
+      taskSnap.forEach(child=>{
+        const t=child.val();
+        if(t.status==="accepted"){
+          busy[t.acceptedBy]=t;
+        }
+      });
+
+      div.innerHTML="";
+
+      const shunters=new Set([
+        ...Object.keys(power),
+        ...Object.keys(busy)
+      ]);
+
+      if(shunters.size===0){
+        div.innerHTML="No active shunters";
+        return;
+      }
+
+      shunters.forEach(name=>{
+
+        const row=document.createElement("div");
+
+        if(power[name]){
+
+          row.innerHTML=`${name} — ⚡ Power ${power[name].bay}`;
+
+        }else if(busy[name]){
+
+          row.innerHTML=`${name} — Moving ${busy[name].trailer}`;
+
+        }else{
+
+          row.innerHTML=`${name} — Available`;
+
+        }
+
+        div.appendChild(row);
+
+      });
+
+    });
+
+  });
+
+}
+
 window.onload=function(){
 
   loadTasks();
   loadPowerConnections();
+  loadShunterStatus();
 
 };
