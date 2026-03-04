@@ -1,238 +1,282 @@
-<!DOCTYPE html>
-<html>
-<head>
-<title>Shunter Tasks</title>
-<link rel="stylesheet" href="style.css">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
+function addTask(button) {
 
-<body>
+  const trailer = document.getElementById("trailer")?.value || "";
+  const from = document.getElementById("from")?.value || "";
+  const to = document.getElementById("to")?.value || "";
+  const type = document.getElementById("type")?.value || "";
+  const bay = document.getElementById("bay")?.value || "";
 
-<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;">
-<h2 id="shunterName"></h2>
-<button onclick="logout()">Logout</button>
-</div>
+  if (!trailer) {
+    alert("Enter trailer number");
+    return;
+  }
 
-<h1 style="text-align:center;">Task</h1>
+  button.disabled = true;
+  button.innerText = "Submitting...";
 
-<div id="screen" style="padding:20px;text-align:center;">Loading...</div>
+  db.ref("tasks").once("value", snapshot => {
 
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-<script src="config.js"></script>
+    const position = snapshot.numChildren() + 1;
 
-<script>
+    db.ref("tasks").push({
+      trailer,
+      from,
+      to,
+      bay,
+      type,
+      status: "waiting",
+      position: position,
+      created: Date.now()
+    }).then(() => {
 
-let taskListener = null;
+      button.innerText = "Task Added ✓";
 
-function logout(){
-localStorage.removeItem("shunterName");
-window.location.href="shunter-login.html";
-}
+      setTimeout(() => {
+        button.disabled = false;
+        button.innerText = "Submit Task";
+      }, 1500);
 
-function getShunter(){
-return localStorage.getItem("shunterName");
-}
+    });
 
-function acceptTask(id){
-db.ref("tasks/"+id).update({
-status:"accepted",
-acceptedBy:getShunter()
-});
-}
-
-function completeTask(id){
-db.ref("tasks/"+id).remove();
-}
-
-function connectPower(task){
-
-const shunter=getShunter();
-
-db.ref("powerConnections/"+shunter).set({
-trailer:task.trailer,
-bay:task.bay,
-status:"connected",
-connectedAt:Date.now()
-});
-
-db.ref("tasks/"+task.id).remove();
+  });
 
 }
 
-function acknowledgePower(){
 
-const shunter=getShunter();
+function moveUp(id){
 
-db.ref("powerConnections/"+shunter).remove();
+  db.ref("tasks").once("value", snapshot=>{
 
-}
+    let tasks=[];
 
-function showConnected(power){
+    snapshot.forEach(child=>{
+      let t=child.val();
+      t.id=child.key;
+      tasks.push(t);
+    });
 
-const div=document.getElementById("screen");
+    tasks.sort((a,b)=>a.position-b.position);
 
-if(power.status==="connected"){
+    const index=tasks.findIndex(t=>t.id===id);
 
-div.innerHTML=`
-<h2>⚡ POWER CONNECTED</h2>
-<p>Trailer: ${power.trailer}</p>
-<p>Bay: ${power.bay}</p>
-<p>Waiting for supervisor</p>
-`;
+    if(index<=0) return;
 
-return;
+    const current=tasks[index];
+    const above=tasks[index-1];
 
-}
+    db.ref("tasks/"+current.id+"/position").set(above.position);
+    db.ref("tasks/"+above.id+"/position").set(current.position);
 
-if(power.status==="readyToDisconnect"){
-
-div.innerHTML=`
-<h2>POWER COMPLETE</h2>
-<p>${power.trailer}</p>
-<p>Bay ${power.bay}</p>
-
-<button onclick="acknowledgePower()"
-style="width:90%;height:80px;font-size:28px">
-ACKNOWLEDGE
-</button>
-`;
+  });
 
 }
 
-}
 
-function startTaskListener(){
+function moveDown(id){
 
-if(taskListener) return;
+  db.ref("tasks").once("value", snapshot=>{
 
-taskListener=db.ref("tasks").on("value",snapshot=>{
+    let tasks=[];
 
-const shunter=getShunter();
-const div=document.getElementById("screen");
+    snapshot.forEach(child=>{
+      let t=child.val();
+      t.id=child.key;
+      tasks.push(t);
+    });
 
-let tasks=[];
+    tasks.sort((a,b)=>a.position-b.position);
 
-snapshot.forEach(child=>{
-let t=child.val();
-t.id=child.key;
-tasks.push(t);
-});
+    const index=tasks.findIndex(t=>t.id===id);
 
-tasks.sort((a,b)=>a.position-b.position);
+    if(index===tasks.length-1) return;
 
-let myTask=tasks.find(t=>t.status==="accepted" && t.acceptedBy===shunter);
+    const current=tasks[index];
+    const below=tasks[index+1];
 
-if(myTask){
+    db.ref("tasks/"+current.id+"/position").set(below.position);
+    db.ref("tasks/"+below.id+"/position").set(current.position);
 
-if(myTask.type==="Provide Power (DD)"){
-
-div.innerHTML=`
-<h2>${myTask.trailer}</h2>
-<p>Provide Power</p>
-<p>Bay ${myTask.bay}</p>
-
-<button onclick='connectPower(${JSON.stringify(myTask)})'
-style="width:90%;height:80px;font-size:28px">
-CONNECTED
-</button>
-`;
-
-return;
+  });
 
 }
 
-div.innerHTML=`
-<h2>${myTask.trailer}</h2>
-<p>${myTask.type}</p>
-<p>${myTask.from||""} ${myTask.to?"→ "+myTask.to:""}</p>
 
-<button onclick="completeTask('${myTask.id}')"
-style="width:90%;height:80px;font-size:28px">
-COMPLETE
-</button>
-`;
+function finishPower(shunter, button){
 
-return;
+  button.disabled = true;
+  button.innerText = "Finishing...";
 
-}
+  db.ref("powerConnections/"+shunter).update({
+    status:"readyToDisconnect"
+  }).then(()=>{
 
-let nextTask=tasks.find(t=>t.status==="waiting");
+    button.innerText="Finished ✓";
 
-if(nextTask){
-
-div.innerHTML=`
-<h2>${nextTask.trailer}</h2>
-<p>${nextTask.type}</p>
-<p>${nextTask.bay ? "Bay "+nextTask.bay : ""}</p>
-<p>${nextTask.from||""} ${nextTask.to?"→ "+nextTask.to:""}</p>
-
-<button onclick="acceptTask('${nextTask.id}')"
-style="width:90%;height:80px;font-size:28px">
-ACCEPT
-</button>
-`;
-
-return;
+  });
 
 }
 
-div.innerHTML="No tasks waiting";
 
-});
+function loadTasks() {
+
+  const tasksDiv = document.getElementById("tasks");
+
+  if(!tasksDiv) return;
+
+  db.ref("tasks").on("value", snapshot => {
+
+    tasksDiv.innerHTML = "";
+
+    let tasks=[];
+
+    snapshot.forEach(child=>{
+      let t=child.val();
+      t.id=child.key;
+      tasks.push(t);
+    });
+
+    tasks.sort((a,b)=>a.position-b.position);
+
+    tasks.forEach(task=>{
+
+      const div = document.createElement("div");
+      div.className="task";
+
+      div.innerHTML=`
+      <b>${task.trailer}</b> — ${task.type}<br>
+      ${task.bay ? "Bay "+task.bay : ""}
+      <br>${task.from || ""} ${task.to ? "→ "+task.to : ""}
+      <br><i>${task.status}</i>
+      ${task.acceptedBy ? `<br><b>Accepted by:</b> ${task.acceptedBy}` : ""}
+
+      <br><br>
+
+      <button onclick="moveUp('${task.id}')">▲</button>
+      <button onclick="moveDown('${task.id}')">▼</button>
+      `;
+
+      tasksDiv.appendChild(div);
+
+    });
+
+  });
 
 }
 
-function stopTaskListener(){
 
-if(taskListener){
+function loadPowerConnections(){
 
-db.ref("tasks").off("value",taskListener);
-taskListener=null;
+  const div=document.getElementById("powerConnections");
+
+  if(!div) return;
+
+  db.ref("powerConnections").on("value",snapshot=>{
+
+    div.innerHTML="";
+
+    snapshot.forEach(child=>{
+
+      const p=child.val();
+      const shunter=child.key;
+
+      const row=document.createElement("div");
+
+      row.className="task";
+
+      row.innerHTML=`
+      ⚡ ${p.bay} — ${p.trailer} — ${shunter}
+      <br>
+      <button onclick="finishPower('${shunter}', this)">
+      FINISH POWER
+      </button>
+      `;
+
+      div.appendChild(row);
+
+    });
+
+  });
 
 }
 
+
+function loadShunterStatus(){
+
+  const div=document.getElementById("shunterStatus");
+
+  if(!div) return;
+
+  function refresh(){
+
+    db.ref("powerConnections").once("value", powerSnap=>{
+
+      let power={};
+
+      powerSnap.forEach(child=>{
+        power[child.key]=child.val();
+      });
+
+      db.ref("tasks").once("value", taskSnap=>{
+
+        let busy={};
+
+        taskSnap.forEach(child=>{
+          const t=child.val();
+          if(t.status==="accepted"){
+            busy[t.acceptedBy]=t;
+          }
+        });
+
+        div.innerHTML="";
+
+        const shunters=new Set([
+          ...Object.keys(power),
+          ...Object.keys(busy)
+        ]);
+
+        if(shunters.size===0){
+          div.innerHTML="No active shunters";
+          return;
+        }
+
+        shunters.forEach(name=>{
+
+          const row=document.createElement("div");
+
+          if(power[name]){
+
+            row.innerHTML=`${name} — ⚡ Power ${power[name].bay}`;
+
+          }else if(busy[name]){
+
+            row.innerHTML=`${name} — Moving ${busy[name].trailer}`;
+
+          }else{
+
+            row.innerHTML=`${name} — Available`;
+
+          }
+
+          div.appendChild(row);
+
+        });
+
+      });
+
+    });
+
+  }
+
+  db.ref("tasks").on("value", refresh);
+  db.ref("powerConnections").on("value", refresh);
+
 }
 
-function start(){
-
-const shunter=getShunter();
-
-document.getElementById("shunterName").innerText="Shunter: "+shunter;
-
-db.ref("powerConnections/"+shunter).on("value",snap=>{
-
-const power=snap.val();
-
-if(power){
-
-stopTaskListener();
-showConnected(power);
-
-}else{
-
-startTaskListener();
-
-}
-
-});
-
-}
 
 window.onload=function(){
 
-const shunter=getShunter();
+  loadTasks();
+  loadPowerConnections();
+  loadShunterStatus();
 
-if(!shunter){
-window.location.href="shunter-login.html";
-return;
-}
-
-start();
-
-}
-
-</script>
-
-</body>
-</html>
+};
