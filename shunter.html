@@ -66,14 +66,15 @@ taskDiv.innerHTML="";
 let tasks=[];
 
 snapshot.forEach(function(child){
-let task=child.val();
-task.id=child.key;
-tasks.push(task);
+let t=child.val();
+t.id=child.key;
+tasks.push(t);
 });
 
 tasks.sort((a,b)=>a.created-b.created);
 
-let myTask=tasks.find(t=>t.status==="accepted" && t.acceptedBy===shunter);
+// FIRST: check if this shunter already has a job
+let myTask=tasks.find(t => t.status==="accepted" && t.acceptedBy===shunter);
 
 if(myTask){
 
@@ -89,7 +90,8 @@ taskDiv.innerHTML=`
 return;
 }
 
-let nextTask=tasks.find(t=>t.status==="waiting");
+// SECOND: find first job nobody has accepted
+let nextTask=tasks.find(t => t.status==="waiting");
 
 if(nextTask){
 
