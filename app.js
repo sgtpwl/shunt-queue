@@ -42,6 +42,7 @@ function loadTasks() {
         <b>${task.trailer}</b> — ${task.type}<br>
         ${task.from || ""} ${task.to ? "→ " + task.to : ""}
         <br><i>${task.status}</i>
+        ${task.acceptedBy ? `<br><b>Accepted by:</b> ${task.acceptedBy}` : ""}
       `;
 
       tasksDiv.appendChild(div);
