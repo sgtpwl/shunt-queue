@@ -43,31 +43,15 @@ function getShunter(){
 return localStorage.getItem("shunterName");
 }
 
-function acceptTask(id, task){
-
-let update = {
+function acceptTask(id){
+db.ref("tasks/"+id).update({
 status:"accepted",
 acceptedBy:getShunter()
-};
-
-if(task.type === "Provide Power (DD)"){
-update.powerTrailer = task.trailer;
+});
 }
 
-db.ref("tasks/"+id).update(update);
-
-}
-
-function completeTask(id, task){
-
-if(task.type === "Remove Power (DD)"){
-// remove power lock
+function completeTask(id){
 db.ref("tasks/"+id).remove();
-return;
-}
-
-db.ref("tasks/"+id).remove();
-
 }
 
 function loadNextTask(){
@@ -79,72 +63,56 @@ const shunter=getShunter();
 const taskDiv=document.getElementById("nextTask");
 taskDiv.innerHTML="";
 
-let myPowerTrailer=null;
+let myAcceptedTask=null;
+let myAcceptedId=null;
+
+let nextWaitingTask=null;
+let nextWaitingId=null;
 
 snapshot.forEach(function(child){
 
 const t=child.val();
 
-if(t.type==="Provide Power (DD)" && t.status==="accepted" && t.acceptedBy===shunter){
-myPowerTrailer=t.trailer;
+if(!myAcceptedTask && t.status==="accepted" && t.acceptedBy===shunter){
+myAcceptedTask=t;
+myAcceptedId=child.key;
 }
 
 });
-
-let acceptedTask=null;
-let acceptedId=null;
-
-let waitingTask=null;
-let waitingId=null;
 
 snapshot.forEach(function(child){
 
 const t=child.val();
 
-if(!acceptedTask && t.status==="accepted" && t.acceptedBy===shunter){
-acceptedTask=t;
-acceptedId=child.key;
-}
-
-if(!waitingTask && t.status==="waiting"){
-
-if(myPowerTrailer){
-if(t.type==="Remove Power (DD)" && t.trailer===myPowerTrailer){
-waitingTask=t;
-waitingId=child.key;
-}
-}
-else{
-waitingTask=t;
-waitingId=child.key;
-}
-
+if(!nextWaitingTask && t.status==="waiting"){
+nextWaitingTask=t;
+nextWaitingId=child.key;
 }
 
 });
 
-if(acceptedTask){
+if(myAcceptedTask){
 
 taskDiv.innerHTML=`
 <div class="task">
-<h2 style="font-size:40px;">${acceptedTask.trailer}</h2>
-<p style="font-size:28px;"><strong>${acceptedTask.type}</strong></p>
-<p style="font-size:24px;">${acceptedTask.from || ""} ${acceptedTask.to ? "→ "+acceptedTask.to : ""}</p>
-<button onclick='completeTask("${acceptedId}", ${JSON.stringify(acceptedTask)})' style="width:90%;height:80px;font-size:28px;">COMPLETE</button>
+<h2 style="font-size:40px;">${myAcceptedTask.trailer}</h2>
+<p style="font-size:28px;"><strong>${myAcceptedTask.type}</strong></p>
+<p style="font-size:24px;">${myAcceptedTask.from || ""} ${myAcceptedTask.to ? "→ "+myAcceptedTask.to : ""}</p>
+<button onclick="completeTask('${myAcceptedId}')" style="width:90%;height:80px;font-size:28px;">COMPLETE</button>
 </div>
 `;
 
 return;
 }
 
-if(waitingTask){
+if(nextWaitingTask){
 
 taskDiv.innerHTML=`
 <div class="task">
-<h2 style="font-size:40px;">${waitingTask.trailer}</h2>
-<p style="font-size:28px;"><strong>${waitingTask.type}</strong></p>
-<p style="font-size:24px;">${waitingTask.from || ""} ${waitingTask.to ? "→ "+waitingTask.to : ""}</p>
-<button onclick='acceptTask("${waitingId}", ${JSON.stringify(waitingTask)})' style="width:90%;height:80px;font-size:28px;">ACCEPT</button>
+<h2 style="font-size:40px;">${nextWaitingTask.trailer}</h2>
+<p style="font-size:28px;"><strong>${nextWaitingTask.type}</strong></p>
+<p style="font-size:24px;">${nextWaitingTask.from || ""} ${nextWaitingTask.to ? "→ "+nextWaitingTask.to : ""}</p>
+<button onclick="acceptTask('${nextWaitingId}')" style="width:90%;height:80px;font-size:28px;">ACCEPT</button>
 </div>
 `;
 
