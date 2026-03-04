@@ -41,8 +41,6 @@ function getShunter(){
 return localStorage.getItem("shunterName");
 }
 
-
-
 function endShift(){
 
 const name=getShunter();
@@ -54,8 +52,6 @@ localStorage.removeItem("shunterName");
 window.location.href="shunter-login.html";
 
 }
-
-
 
 function setBreak(){
 
@@ -70,8 +66,6 @@ document.getElementById("screen").innerHTML="<h2>ON BREAK</h2>";
 
 }
 
-
-
 function backFromBreak(){
 
 const name=getShunter();
@@ -85,15 +79,14 @@ loadTasks();
 
 }
 
-
-
 function acceptTask(id){
 
 const name=getShunter();
 
 db.ref("tasks/"+id).update({
 status:"accepted",
-acceptedBy:name
+acceptedBy:name,
+acceptedTime:Date.now()
 });
 
 db.ref("shunters/"+name).update({
@@ -102,21 +95,20 @@ status:"busy"
 
 }
 
-
-
 function completeTask(id){
 
 const name=getShunter();
 
-db.ref("tasks/"+id).remove();
+db.ref("tasks/"+id).update({
+status:"completed",
+completedTime:Date.now()
+});
 
 db.ref("shunters/"+name).update({
 status:"available"
 });
 
 }
-
-
 
 function connectPower(task){
 
@@ -128,15 +120,17 @@ bay:task.bay,
 status:"connected"
 });
 
-db.ref("tasks/"+task.id).remove();
+db.ref("tasks/"+task.id).update({
+status:"accepted",
+acceptedBy:name,
+acceptedTime:Date.now()
+});
 
 db.ref("shunters/"+name).update({
 status:"power"
 });
 
 }
-
-
 
 function acknowledgePower(){
 
@@ -149,8 +143,6 @@ status:"available"
 });
 
 }
-
-
 
 function loadTasks(){
 
@@ -166,6 +158,8 @@ let t=child.val();
 t.id=child.key;
 tasks.push(t);
 });
+
+tasks=tasks.filter(t=>t.status!=="completed");
 
 tasks.sort((a,b)=>a.position-b.position);
 
@@ -204,8 +198,6 @@ return;
 
 }
 
-
-
 let nextTask=tasks.find(t=>t.status==="waiting");
 
 if(nextTask){
@@ -230,8 +222,6 @@ div.innerHTML="No tasks waiting";
 
 }
 
-
-
 function start(){
 
 const shunter=getShunter();
@@ -244,8 +234,6 @@ const power=snap.val();
 
 if(power){
 
-if(power.status==="connected"){
-
 document.getElementById("screen").innerHTML=`
 <h2>⚡ POWER CONNECTED</h2>
 <p>${power.trailer}</p>
@@ -256,30 +244,11 @@ return;
 
 }
 
-if(power.status==="readyToDisconnect"){
-
-document.getElementById("screen").innerHTML=`
-<h2>POWER COMPLETE</h2>
-
-<button onclick="acknowledgePower()"
-style="width:90%;height:80px;font-size:28px">
-ACKNOWLEDGE
-</button>
-`;
-
-return;
-
-}
-
-}
-
 loadTasks();
 
 });
 
 }
-
-
 
 window.onload=function(){
 
