@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Shunter Login</title>
+<link rel="stylesheet" href="style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+
+<body style="text-align:center; padding-top:60px;">
+
+<h1>Start Shift</h1>
+
+<br>
+
+<input id="name" placeholder="Enter your name"
+style="font-size:20px;padding:10px;width:250px;text-align:center;">
+
+<br><br>
+
+<button onclick="startShift()" style="width:250px;height:60px;font-size:22px;">
+Start Shift
+</button>
+
+<script>
+
+function startShift() {
+
+const name = document.getElementById("name").value.trim();
+
+if(!name){
+alert("Enter your name");
+return;
+}
+
+localStorage.setItem("shunterName", name);
+
+window.location.href = "shunter.html";
+
+}
+
+</script>
+
+</body>
+</html>
