@@ -10,7 +10,7 @@
 
 <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;">
 <h2 id="shunterName"></h2>
-<button onclick="logout()" style="height:40px;">Logout</button>
+<button onclick="logout()">Logout</button>
 </div>
 
 <h1 style="text-align:center;">Next Task</h1>
@@ -63,27 +63,17 @@ const shunter=getShunter();
 const taskDiv=document.getElementById("nextTask");
 taskDiv.innerHTML="";
 
-let myTask=null;
-let myTaskId=null;
-
-let firstWaiting=null;
-let firstWaitingId=null;
+let tasks=[];
 
 snapshot.forEach(function(child){
-
-const task=child.val();
-
-if(task.status==="accepted" && task.acceptedBy===shunter && !myTask){
-myTask=task;
-myTaskId=child.key;
-}
-
-if(task.status==="waiting" && !firstWaiting){
-firstWaiting=task;
-firstWaitingId=child.key;
-}
-
+let task=child.val();
+task.id=child.key;
+tasks.push(task);
 });
+
+tasks.sort((a,b)=>a.created-b.created);
+
+let myTask=tasks.find(t=>t.status==="accepted" && t.acceptedBy===shunter);
 
 if(myTask){
 
@@ -92,21 +82,23 @@ taskDiv.innerHTML=`
 <h2 style="font-size:40px;">${myTask.trailer}</h2>
 <p style="font-size:28px;"><strong>${myTask.type}</strong></p>
 <p style="font-size:24px;">${myTask.from || ""} ${myTask.to ? "→ "+myTask.to : ""}</p>
-<button onclick="completeTask('${myTaskId}')" style="width:90%;height:80px;font-size:28px;">COMPLETE</button>
+<button onclick="completeTask('${myTask.id}')" style="width:90%;height:80px;font-size:28px;">COMPLETE</button>
 </div>
 `;
 
 return;
 }
 
-if(firstWaiting){
+let nextTask=tasks.find(t=>t.status==="waiting");
+
+if(nextTask){
 
 taskDiv.innerHTML=`
 <div class="task">
-<h2 style="font-size:40px;">${firstWaiting.trailer}</h2>
-<p style="font-size:28px;"><strong>${firstWaiting.type}</strong></p>
-<p style="font-size:24px;">${firstWaiting.from || ""} ${firstWaiting.to ? "→ "+firstWaiting.to : ""}</p>
-<button onclick="acceptTask('${firstWaitingId}')" style="width:90%;height:80px;font-size:28px;">ACCEPT</button>
+<h2 style="font-size:40px;">${nextTask.trailer}</h2>
+<p style="font-size:28px;"><strong>${nextTask.type}</strong></p>
+<p style="font-size:24px;">${nextTask.from || ""} ${nextTask.to ? "→ "+nextTask.to : ""}</p>
+<button onclick="acceptTask('${nextTask.id}')" style="width:90%;height:80px;font-size:28px;">ACCEPT</button>
 </div>
 `;
 
