@@ -21,6 +21,7 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <script>
+
 const firebaseConfig = {
 apiKey: "AIzaSyACwPAzBK_TFOyIuuI0iNzy_9zW-CKA7m4",
 authDomain: "shunt-queue.firebaseapp.com",
@@ -63,19 +64,19 @@ const shunter=getShunter();
 const taskDiv=document.getElementById("nextTask");
 taskDiv.innerHTML="";
 
-let myAcceptedTask=null;
-let myAcceptedId=null;
+let myTask=null;
+let myTaskId=null;
 
-let nextWaitingTask=null;
-let nextWaitingId=null;
+let nextTask=null;
+let nextTaskId=null;
 
 snapshot.forEach(function(child){
 
 const t=child.val();
 
-if(!myAcceptedTask && t.status==="accepted" && t.acceptedBy===shunter){
-myAcceptedTask=t;
-myAcceptedId=child.key;
+if(!myTask && t.status==="accepted" && t.acceptedBy===shunter){
+myTask=t;
+myTaskId=child.key;
 }
 
 });
@@ -84,35 +85,35 @@ snapshot.forEach(function(child){
 
 const t=child.val();
 
-if(!nextWaitingTask && t.status==="waiting"){
-nextWaitingTask=t;
-nextWaitingId=child.key;
+if(!nextTask && t.status==="waiting"){
+nextTask=t;
+nextTaskId=child.key;
 }
 
 });
 
-if(myAcceptedTask){
+if(myTask){
 
 taskDiv.innerHTML=`
 <div class="task">
-<h2 style="font-size:40px;">${myAcceptedTask.trailer}</h2>
-<p style="font-size:28px;"><strong>${myAcceptedTask.type}</strong></p>
-<p style="font-size:24px;">${myAcceptedTask.from || ""} ${myAcceptedTask.to ? "→ "+myAcceptedTask.to : ""}</p>
-<button onclick="completeTask('${myAcceptedId}')" style="width:90%;height:80px;font-size:28px;">COMPLETE</button>
+<h2 style="font-size:40px;">${myTask.trailer}</h2>
+<p style="font-size:28px;"><strong>${myTask.type}</strong></p>
+<p style="font-size:24px;">${myTask.from || ""} ${myTask.to ? "→ "+myTask.to : ""}</p>
+<button onclick="completeTask('${myTaskId}')" style="width:90%;height:80px;font-size:28px;">COMPLETE</button>
 </div>
 `;
 
 return;
 }
 
-if(nextWaitingTask){
+if(nextTask){
 
 taskDiv.innerHTML=`
 <div class="task">
-<h2 style="font-size:40px;">${nextWaitingTask.trailer}</h2>
-<p style="font-size:28px;"><strong>${nextWaitingTask.type}</strong></p>
-<p style="font-size:24px;">${nextWaitingTask.from || ""} ${nextWaitingTask.to ? "→ "+nextWaitingTask.to : ""}</p>
-<button onclick="acceptTask('${nextWaitingId}')" style="width:90%;height:80px;font-size:28px;">ACCEPT</button>
+<h2 style="font-size:40px;">${nextTask.trailer}</h2>
+<p style="font-size:28px;"><strong>${nextTask.type}</strong></p>
+<p style="font-size:24px;">${nextTask.from || ""} ${nextTask.to ? "→ "+nextTask.to : ""}</p>
+<button onclick="acceptTask('${nextTaskId}')" style="width:90%;height:80px;font-size:28px;">ACCEPT</button>
 </div>
 `;
 
@@ -122,6 +123,7 @@ return;
 taskDiv.innerHTML="<div class='task'>No tasks waiting</div>";
 
 });
+
 }
 
 window.onload=function(){
@@ -138,6 +140,7 @@ document.getElementById("shunterName").innerText="Shunter: "+shunter;
 loadNextTask();
 
 }
+
 </script>
 
 </body>
