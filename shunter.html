@@ -43,9 +43,10 @@ function addTask(button) {
 }
 
 
+
 function moveUp(id){
 
-  db.ref("tasks").once("value", snapshot=>{
+  db.ref("tasks").once("value",snapshot=>{
 
     let tasks=[];
 
@@ -57,24 +58,27 @@ function moveUp(id){
 
     tasks.sort((a,b)=>a.position-b.position);
 
-    const index=tasks.findIndex(t=>t.id===id);
+    let index=tasks.findIndex(t=>t.id===id);
 
     if(index<=0) return;
 
-    const current=tasks[index];
-    const above=tasks[index-1];
+    const temp=tasks[index];
+    tasks[index]=tasks[index-1];
+    tasks[index-1]=temp;
 
-    db.ref("tasks/"+current.id+"/position").set(above.position);
-    db.ref("tasks/"+above.id+"/position").set(current.position);
+    tasks.forEach((t,i)=>{
+      db.ref("tasks/"+t.id+"/position").set(i+1);
+    });
 
   });
 
 }
+
 
 
 function moveDown(id){
 
-  db.ref("tasks").once("value", snapshot=>{
+  db.ref("tasks").once("value",snapshot=>{
 
     let tasks=[];
 
@@ -86,19 +90,22 @@ function moveDown(id){
 
     tasks.sort((a,b)=>a.position-b.position);
 
-    const index=tasks.findIndex(t=>t.id===id);
+    let index=tasks.findIndex(t=>t.id===id);
 
-    if(index===tasks.length-1) return;
+    if(index>=tasks.length-1) return;
 
-    const current=tasks[index];
-    const below=tasks[index+1];
+    const temp=tasks[index];
+    tasks[index]=tasks[index+1];
+    tasks[index+1]=temp;
 
-    db.ref("tasks/"+current.id+"/position").set(below.position);
-    db.ref("tasks/"+below.id+"/position").set(current.position);
+    tasks.forEach((t,i)=>{
+      db.ref("tasks/"+t.id+"/position").set(i+1);
+    });
 
   });
 
 }
+
 
 
 function finishPower(shunter, button){
@@ -115,6 +122,7 @@ function finishPower(shunter, button){
   });
 
 }
+
 
 
 function loadTasks() {
@@ -164,6 +172,7 @@ function loadTasks() {
 }
 
 
+
 function loadPowerConnections(){
 
   const div=document.getElementById("powerConnections");
@@ -200,6 +209,7 @@ function loadPowerConnections(){
 }
 
 
+
 function loadShunterStatus(){
 
   const div=document.getElementById("shunterStatus");
@@ -208,56 +218,56 @@ function loadShunterStatus(){
 
   function refresh(){
 
-    db.ref("powerConnections").once("value", powerSnap=>{
+    db.ref("shunters").once("value", shunterSnap=>{
 
-      let power={};
+      let shunters={};
 
-      powerSnap.forEach(child=>{
-        power[child.key]=child.val();
+      shunterSnap.forEach(child=>{
+        shunters[child.key]=true;
       });
 
-      db.ref("tasks").once("value", taskSnap=>{
+      db.ref("powerConnections").once("value", powerSnap=>{
 
-        let busy={};
+        let power={};
 
-        taskSnap.forEach(child=>{
-          const t=child.val();
-          if(t.status==="accepted"){
-            busy[t.acceptedBy]=t;
-          }
+        powerSnap.forEach(child=>{
+          power[child.key]=child.val();
         });
 
-        div.innerHTML="";
+        db.ref("tasks").once("value", taskSnap=>{
 
-        const shunters=new Set([
-          ...Object.keys(power),
-          ...Object.keys(busy)
-        ]);
+          let busy={};
 
-        if(shunters.size===0){
-          div.innerHTML="No active shunters";
-          return;
-        }
+          taskSnap.forEach(child=>{
+            const t=child.val();
+            if(t.status==="accepted"){
+              busy[t.acceptedBy]=t;
+            }
+          });
 
-        shunters.forEach(name=>{
+          div.innerHTML="";
 
-          const row=document.createElement("div");
+          Object.keys(shunters).forEach(name=>{
 
-          if(power[name]){
+            const row=document.createElement("div");
 
-            row.innerHTML=`${name} — ⚡ Power ${power[name].bay}`;
+            if(power[name]){
 
-          }else if(busy[name]){
+              row.innerHTML=`${name} — ⚡ Power ${power[name].bay}`;
 
-            row.innerHTML=`${name} — Moving ${busy[name].trailer}`;
+            }else if(busy[name]){
 
-          }else{
+              row.innerHTML=`${name} — Moving ${busy[name].trailer}`;
 
-            row.innerHTML=`${name} — Available`;
+            }else{
 
-          }
+              row.innerHTML=`${name} — Available`;
 
-          div.appendChild(row);
+            }
+
+            div.appendChild(row);
+
+          });
 
         });
 
@@ -267,10 +277,12 @@ function loadShunterStatus(){
 
   }
 
-  db.ref("tasks").on("value", refresh);
-  db.ref("powerConnections").on("value", refresh);
+  db.ref("tasks").on("value",refresh);
+  db.ref("powerConnections").on("value",refresh);
+  db.ref("shunters").on("value",refresh);
 
 }
+
 
 
 window.onload=function(){
