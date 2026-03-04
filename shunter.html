@@ -23,6 +23,8 @@
 
 <script>
 
+let taskListener = null;
+
 function logout(){
 localStorage.removeItem("shunterName");
 window.location.href="shunter-login.html";
@@ -100,9 +102,11 @@ ACKNOWLEDGE
 
 }
 
-function loadTasks(){
+function startTaskListener(){
 
-db.ref("tasks").on("value",snapshot=>{
+if(taskListener) return;
+
+taskListener=db.ref("tasks").on("value",snapshot=>{
 
 const shunter=getShunter();
 const div=document.getElementById("screen");
@@ -179,6 +183,17 @@ div.innerHTML="No tasks waiting";
 
 }
 
+function stopTaskListener(){
+
+if(taskListener){
+
+db.ref("tasks").off("value",taskListener);
+taskListener=null;
+
+}
+
+}
+
 function start(){
 
 const shunter=getShunter();
@@ -191,11 +206,12 @@ const power=snap.val();
 
 if(power){
 
+stopTaskListener();
 showConnected(power);
 
 }else{
 
-loadTasks();
+startTaskListener();
 
 }
 
