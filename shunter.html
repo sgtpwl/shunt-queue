@@ -43,15 +43,31 @@ function getShunter(){
 return localStorage.getItem("shunterName");
 }
 
-function acceptTask(id){
-db.ref("tasks/"+id).update({
+function acceptTask(id, task){
+
+let update = {
 status:"accepted",
 acceptedBy:getShunter()
-});
+};
+
+if(task.type === "Provide Power (DD)"){
+update.powerTrailer = task.trailer;
 }
 
-function completeTask(id){
+db.ref("tasks/"+id).update(update);
+
+}
+
+function completeTask(id, task){
+
+if(task.type === "Remove Power (DD)"){
+// remove power lock
 db.ref("tasks/"+id).remove();
+return;
+}
+
+db.ref("tasks/"+id).remove();
+
 }
 
 function loadNextTask(){
@@ -62,6 +78,18 @@ db.ref("tasks").orderByChild("created")
 const shunter=getShunter();
 const taskDiv=document.getElementById("nextTask");
 taskDiv.innerHTML="";
+
+let myPowerTrailer=null;
+
+snapshot.forEach(function(child){
+
+const t=child.val();
+
+if(t.type==="Provide Power (DD)" && t.status==="accepted" && t.acceptedBy===shunter){
+myPowerTrailer=t.trailer;
+}
+
+});
 
 let acceptedTask=null;
 let acceptedId=null;
@@ -79,8 +107,18 @@ acceptedId=child.key;
 }
 
 if(!waitingTask && t.status==="waiting"){
+
+if(myPowerTrailer){
+if(t.type==="Remove Power (DD)" && t.trailer===myPowerTrailer){
 waitingTask=t;
 waitingId=child.key;
+}
+}
+else{
+waitingTask=t;
+waitingId=child.key;
+}
+
 }
 
 });
@@ -92,7 +130,7 @@ taskDiv.innerHTML=`
 <h2 style="font-size:40px;">${acceptedTask.trailer}</h2>
 <p style="font-size:28px;"><strong>${acceptedTask.type}</strong></p>
 <p style="font-size:24px;">${acceptedTask.from || ""} ${acceptedTask.to ? "→ "+acceptedTask.to : ""}</p>
-<button onclick="completeTask('${acceptedId}')" style="width:90%;height:80px;font-size:28px;">COMPLETE</button>
+<button onclick='completeTask("${acceptedId}", ${JSON.stringify(acceptedTask)})' style="width:90%;height:80px;font-size:28px;">COMPLETE</button>
 </div>
 `;
 
@@ -106,7 +144,7 @@ taskDiv.innerHTML=`
 <h2 style="font-size:40px;">${waitingTask.trailer}</h2>
 <p style="font-size:28px;"><strong>${waitingTask.type}</strong></p>
 <p style="font-size:24px;">${waitingTask.from || ""} ${waitingTask.to ? "→ "+waitingTask.to : ""}</p>
-<button onclick="acceptTask('${waitingId}')" style="width:90%;height:80px;font-size:28px;">ACCEPT</button>
+<button onclick='acceptTask("${waitingId}", ${JSON.stringify(waitingTask)})' style="width:90%;height:80px;font-size:28px;">ACCEPT</button>
 </div>
 `;
 
