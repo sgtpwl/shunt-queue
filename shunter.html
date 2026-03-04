@@ -1,120 +1,137 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Shunt Queue - Shunter</title>
-  <link rel="stylesheet" href="style.css">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shunter Tasks</title>
+<link rel="stylesheet" href="style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
+
 <body>
 
-<h1>Next Task</h1>
-<div id="nextTask">Loading...</div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;">
+<h2 id="shunterName"></h2>
+<button onclick="logout()" style="height:40px;">Logout</button>
+</div>
+
+<h1 style="text-align:center;">Next Task</h1>
+
+<div id="nextTask" style="padding:20px;text-align:center;">Loading...</div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <script>
 const firebaseConfig = {
-  apiKey: "AIzaSyACwPAzBK_TFOyIuuI0iNzy_9zW-CKA7m4",
-  authDomain: "shunt-queue.firebaseapp.com",
-  databaseURL: "https://shunt-queue-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "shunt-queue",
-  storageBucket: "shunt-queue.appspot.com",
-  messagingSenderId: "773776993625",
-  appId: "1:773776993625:web:2082ee7a38be041bee7048"
+apiKey: "AIzaSyACwPAzBK_TFOyIuuI0iNzy_9zW-CKA7m4",
+authDomain: "shunt-queue.firebaseapp.com",
+databaseURL: "https://shunt-queue-default-rtdb.europe-west1.firebasedatabase.app",
+projectId: "shunt-queue",
+storageBucket: "shunt-queue.appspot.com",
+messagingSenderId: "773776993625",
+appId: "1:773776993625:web:2082ee7a38be041bee7048"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-function getVehicle() {
-  const params = new URLSearchParams(window.location.search);
-  return params.get("vehicle") || "Unknown";
+function logout(){
+localStorage.removeItem("shunterName");
+window.location.href="shunter-login.html";
 }
 
-function acceptTask(id) {
-  db.ref("tasks/" + id).update({
-    status: "accepted",
-    acceptedBy: getVehicle()
-  });
+function getShunter(){
+return localStorage.getItem("shunterName");
 }
 
-function completeTask(id) {
-  db.ref("tasks/" + id).remove();
+function acceptTask(id){
+db.ref("tasks/"+id).update({
+status:"accepted",
+acceptedBy:getShunter()
+});
 }
 
-function loadNextTask() {
-
-  db.ref("tasks").orderByChild("created")
-  .on("value", function(snapshot) {
-
-    const vehicle = getVehicle();
-    const taskDiv = document.getElementById("nextTask");
-    taskDiv.innerHTML = "";
-
-    let acceptedTask = null;
-    let acceptedId = null;
-
-    let waitingTask = null;
-    let waitingId = null;
-
-    snapshot.forEach(function(child) {
-
-      const t = child.val();
-
-      // PRIORITY 1: job already accepted by this vehicle
-      if (!acceptedTask && t.status === "accepted" && t.acceptedBy === vehicle) {
-        acceptedTask = t;
-        acceptedId = child.key;
-      }
-
-      // PRIORITY 2: first waiting job
-      if (!waitingTask && t.status === "waiting") {
-        waitingTask = t;
-        waitingId = child.key;
-      }
-
-    });
-
-    // Show accepted job first
-    if (acceptedTask) {
-
-      taskDiv.innerHTML = `
-        <div class="task">
-          <h2>${acceptedTask.trailer}</h2>
-          <p><strong>${acceptedTask.type}</strong></p>
-          <p>${acceptedTask.from || ""} ${acceptedTask.to ? "→ " + acceptedTask.to : ""}</p>
-          <p><strong>Status:</strong> accepted</p>
-          <p><strong>Accepted by:</strong> ${vehicle}</p>
-          <button onclick="completeTask('${acceptedId}')">COMPLETE</button>
-        </div>
-      `;
-
-      return;
-    }
-
-    // Otherwise show next waiting job
-    if (waitingTask) {
-
-      taskDiv.innerHTML = `
-        <div class="task">
-          <h2>${waitingTask.trailer}</h2>
-          <p><strong>${waitingTask.type}</strong></p>
-          <p>${waitingTask.from || ""} ${waitingTask.to ? "→ " + waitingTask.to : ""}</p>
-          <p><strong>Status:</strong> waiting</p>
-          <button onclick="acceptTask('${waitingId}')">ACCEPT</button>
-        </div>
-      `;
-
-      return;
-    }
-
-    taskDiv.innerHTML = "<div class='task'>No tasks waiting</div>";
-
-  });
+function completeTask(id){
+db.ref("tasks/"+id).remove();
 }
 
-window.onload = loadNextTask;
+function loadNextTask(){
+
+db.ref("tasks").orderByChild("created")
+.on("value",function(snapshot){
+
+const shunter=getShunter();
+const taskDiv=document.getElementById("nextTask");
+taskDiv.innerHTML="";
+
+let acceptedTask=null;
+let acceptedId=null;
+
+let waitingTask=null;
+let waitingId=null;
+
+snapshot.forEach(function(child){
+
+const t=child.val();
+
+if(!acceptedTask && t.status==="accepted" && t.acceptedBy===shunter){
+acceptedTask=t;
+acceptedId=child.key;
+}
+
+if(!waitingTask && t.status==="waiting"){
+waitingTask=t;
+waitingId=child.key;
+}
+
+});
+
+if(acceptedTask){
+
+taskDiv.innerHTML=`
+<div class="task">
+<h2 style="font-size:40px;">${acceptedTask.trailer}</h2>
+<p style="font-size:28px;"><strong>${acceptedTask.type}</strong></p>
+<p style="font-size:24px;">${acceptedTask.from || ""} ${acceptedTask.to ? "→ "+acceptedTask.to : ""}</p>
+<button onclick="completeTask('${acceptedId}')" style="width:90%;height:80px;font-size:28px;">COMPLETE</button>
+</div>
+`;
+
+return;
+}
+
+if(waitingTask){
+
+taskDiv.innerHTML=`
+<div class="task">
+<h2 style="font-size:40px;">${waitingTask.trailer}</h2>
+<p style="font-size:28px;"><strong>${waitingTask.type}</strong></p>
+<p style="font-size:24px;">${waitingTask.from || ""} ${waitingTask.to ? "→ "+waitingTask.to : ""}</p>
+<button onclick="acceptTask('${waitingId}')" style="width:90%;height:80px;font-size:28px;">ACCEPT</button>
+</div>
+`;
+
+return;
+}
+
+taskDiv.innerHTML="<div class='task'>No tasks waiting</div>";
+
+});
+}
+
+window.onload=function(){
+
+const shunter=getShunter();
+
+if(!shunter){
+window.location.href="shunter-login.html";
+return;
+}
+
+document.getElementById("shunterName").innerText="Shunter: "+shunter;
+
+loadNextTask();
+
+}
 </script>
 
 </body>
