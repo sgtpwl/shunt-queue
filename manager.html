@@ -1,268 +1,93 @@
-function addTask(button) {
+<!DOCTYPE html>
+<html>
+<head>
+<title>Shunt Queue - Manager</title>
+<link rel="stylesheet" href="style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
 
-  const trailer = document.getElementById("trailer")?.value || "";
-  const from = document.getElementById("from")?.value || "";
-  const to = document.getElementById("to")?.value || "";
-  const type = document.getElementById("type")?.value || "";
-  const bay = document.getElementById("bay")?.value || "";
+<body>
 
-  if (!trailer) {
-    alert("Enter trailer number");
-    return;
-  }
+<h1>Shunt Queue - Manager</h1>
 
-  button.disabled = true;
-  button.innerText = "Submitting...";
+<input id="trailer" placeholder="Trailer number">
 
-  db.ref("tasks").once("value", snapshot => {
+<select id="type" onchange="updateForm()">
+<option value="Move Trailer">Move Trailer</option>
+<option value="Provide Power (DD)">Provide Power (DD)</option>
+<option value="Remove Power (DD)">Remove Power (DD)</option>
+</select>
 
-    const position = snapshot.numChildren() + 1;
+<div id="moveFields">
 
-    db.ref("tasks").push({
-      trailer,
-      from,
-      to,
-      bay,
-      type,
-      status: "waiting",
-      position: position,
-      created: Date.now()
-    }).then(() => {
+<input id="from" placeholder="From location">
+<input id="to" placeholder="To location">
 
-      button.innerText = "Task Added ✓";
+</div>
 
-      setTimeout(() => {
-        button.disabled = false;
-        button.innerText = "Add Task";
-      }, 1500);
+<div id="powerFields" style="display:none">
 
-    });
+<select id="bay">
 
-  });
+<option value="">Select Bay</option>
 
-}
+<option>B1</option><option>B2</option><option>B3</option><option>B4</option><option>B5</option>
+<option>B6</option><option>B7</option><option>B8</option><option>B9</option><option>B10</option>
+<option>B11</option><option>B12</option><option>B13</option><option>B14</option><option>B15</option>
+<option>B16</option><option>B17</option><option>B18</option><option>B19</option><option>B20</option>
+<option>B21</option><option>B22</option><option>B23</option><option>B24</option><option>B25</option>
 
-function moveUp(id){
+<option>C1</option><option>C2</option><option>C3</option><option>C4</option><option>C5</option>
+<option>C6</option><option>C7</option><option>C8</option><option>C9</option><option>C10</option>
+<option>C11</option><option>C12</option><option>C13</option><option>C14</option><option>C15</option>
+<option>C16</option><option>C17</option><option>C18</option><option>C19</option><option>C20</option>
+<option>C21</option><option>C22</option><option>C23</option><option>C24</option><option>C25</option>
+<option>C26</option>
 
-  db.ref("tasks").once("value", snapshot=>{
+</select>
 
-    let tasks=[];
+</div>
 
-    snapshot.forEach(child=>{
-      let t=child.val();
-      t.id=child.key;
-      tasks.push(t);
-    });
+<button onclick="addTask(this)">Add Task</button>
 
-    tasks.sort((a,b)=>a.position-b.position);
+<h2>SHUNTERS</h2>
+<div id="shunterStatus"></div>
 
-    const index=tasks.findIndex(t=>t.id===id);
+<h2>⚡ Active Power</h2>
+<div id="powerConnections"></div>
 
-    if(index<=0) return;
+<h2>Queue</h2>
+<div id="tasks"></div>
 
-    const current=tasks[index];
-    const above=tasks[index-1];
+<script>
 
-    db.ref("tasks/"+current.id+"/position").set(above.position);
-    db.ref("tasks/"+above.id+"/position").set(current.position);
+function updateForm(){
 
-  });
+const type=document.getElementById("type").value;
 
-}
+const move=document.getElementById("moveFields");
+const power=document.getElementById("powerFields");
 
-function moveDown(id){
+if(type==="Move Trailer"){
 
-  db.ref("tasks").once("value", snapshot=>{
+move.style.display="block";
+power.style.display="none";
 
-    let tasks=[];
+}else{
 
-    snapshot.forEach(child=>{
-      let t=child.val();
-      t.id=child.key;
-      tasks.push(t);
-    });
-
-    tasks.sort((a,b)=>a.position-b.position);
-
-    const index=tasks.findIndex(t=>t.id===id);
-
-    if(index===tasks.length-1) return;
-
-    const current=tasks[index];
-    const below=tasks[index+1];
-
-    db.ref("tasks/"+current.id+"/position").set(below.position);
-    db.ref("tasks/"+below.id+"/position").set(current.position);
-
-  });
+move.style.display="none";
+power.style.display="block";
 
 }
 
-function finishPower(shunter, button){
-
-  button.disabled = true;
-  button.innerText = "Finishing...";
-
-  db.ref("powerConnections/"+shunter).update({
-    status:"readyToDisconnect"
-  }).then(()=>{
-
-    button.innerText="Finished ✓";
-
-  });
-
 }
 
-function loadTasks() {
+</script>
 
-  db.ref("tasks").on("value", snapshot => {
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
 
-    const tasksDiv = document.getElementById("tasks");
-
-    if(!tasksDiv) return;
-
-    tasksDiv.innerHTML = "";
-
-    let tasks=[];
-
-    snapshot.forEach(child=>{
-      let t=child.val();
-      t.id=child.key;
-      tasks.push(t);
-    });
-
-    tasks.sort((a,b)=>a.position-b.position);
-
-    tasks.forEach(task=>{
-
-      const div = document.createElement("div");
-      div.className="task";
-
-      div.innerHTML=`
-      <b>${task.trailer}</b> — ${task.type}<br>
-      ${task.bay ? "Bay "+task.bay : ""}
-      <br>${task.from || ""} ${task.to ? "→ "+task.to : ""}
-      <br><i>${task.status}</i>
-      ${task.acceptedBy ? `<br><b>Accepted by:</b> ${task.acceptedBy}` : ""}
-
-      <br><br>
-
-      <button onclick="moveUp('${task.id}')">▲</button>
-      <button onclick="moveDown('${task.id}')">▼</button>
-      `;
-
-      tasksDiv.appendChild(div);
-
-    });
-
-  });
-
-}
-
-function loadPowerConnections(){
-
-  const div=document.getElementById("powerConnections");
-
-  if(!div) return;
-
-  db.ref("powerConnections").on("value",snapshot=>{
-
-    div.innerHTML="";
-
-    snapshot.forEach(child=>{
-
-      const p=child.val();
-      const shunter=child.key;
-
-      const row=document.createElement("div");
-
-      row.className="task";
-
-      row.innerHTML=`
-      ⚡ ${p.bay} — ${p.trailer} — ${shunter}
-      <br>
-      <button onclick="finishPower('${shunter}', this)">
-      FINISH POWER
-      </button>
-      `;
-
-      div.appendChild(row);
-
-    });
-
-  });
-
-}
-
-function loadShunterStatus(){
-
-  const div=document.getElementById("shunterStatus");
-
-  if(!div) return;
-
-  db.ref("powerConnections").on("value",snapshot=>{
-
-    let power={};
-
-    snapshot.forEach(child=>{
-      power[child.key]=child.val();
-    });
-
-    db.ref("tasks").on("value",taskSnap=>{
-
-      let busy={};
-
-      taskSnap.forEach(child=>{
-        const t=child.val();
-        if(t.status==="accepted"){
-          busy[t.acceptedBy]=t;
-        }
-      });
-
-      div.innerHTML="";
-
-      const shunters=new Set([
-        ...Object.keys(power),
-        ...Object.keys(busy)
-      ]);
-
-      if(shunters.size===0){
-        div.innerHTML="No active shunters";
-        return;
-      }
-
-      shunters.forEach(name=>{
-
-        const row=document.createElement("div");
-
-        if(power[name]){
-
-          row.innerHTML=`${name} — ⚡ Power ${power[name].bay}`;
-
-        }else if(busy[name]){
-
-          row.innerHTML=`${name} — Moving ${busy[name].trailer}`;
-
-        }else{
-
-          row.innerHTML=`${name} — Available`;
-
-        }
-
-        div.appendChild(row);
-
-      });
-
-    });
-
-  });
-
-}
-
-window.onload=function(){
-
-  loadTasks();
-  loadPowerConnections();
-  loadShunterStatus();
-
-};
+</body>
+</html>
