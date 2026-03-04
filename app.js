@@ -1,8 +1,9 @@
 function addTask() {
-  const trailer = document.getElementById("trailer")?.value?.trim() || "";
-  const from = document.getElementById("from")?.value?.trim() || "";
-  const to = document.getElementById("to")?.value?.trim() || "";
-  const type = document.getElementById("type")?.value || "Move Trailer";
+
+  const trailer = document.getElementById("trailer")?.value || "";
+  const from = document.getElementById("from")?.value || "";
+  const to = document.getElementById("to")?.value || "";
+  const type = document.getElementById("type")?.value || "";
   const bay = document.getElementById("bay")?.value || "";
 
   if (!trailer) {
@@ -10,60 +11,97 @@ function addTask() {
     return;
   }
 
-  // For power jobs, bay is strongly recommended
-  if ((type === "Provide Power (DD)" || type === "Remove Power (DD)") && !bay) {
-    if (!confirm("No bay selected. Add this power job without a bay?")) return;
-  }
-
   db.ref("tasks").push({
     trailer,
     from,
     to,
+    bay,
     type,
-    bay,              // <-- NEW
     status: "waiting",
     created: Date.now()
   });
 
-  // Clear inputs (if present)
-  const trailerEl = document.getElementById("trailer");
-  const fromEl = document.getElementById("from");
-  const toEl = document.getElementById("to");
-  const bayEl = document.getElementById("bay");
+}
 
-  if (trailerEl) trailerEl.value = "";
-  if (fromEl) fromEl.value = "";
-  if (toEl) toEl.value = "";
-  if (bayEl) bayEl.value = "";
+function finishPower(shunter){
+
+  db.ref("powerConnections/"+shunter).update({
+    status:"readyToDisconnect"
+  });
+
 }
 
 function loadTasks() {
+
   db.ref("tasks").on("value", snapshot => {
+
     const tasksDiv = document.getElementById("tasks");
-    if (!tasksDiv) return; // supervisor page has no queue
+
+    if(!tasksDiv) return;
 
     tasksDiv.innerHTML = "";
 
     snapshot.forEach(child => {
+
       const task = child.val();
 
       const div = document.createElement("div");
       div.className = "task";
 
-      const bayLine = task.bay ? `<br><b>Bay:</b> ${task.bay}` : "";
-      const acceptedLine = task.acceptedBy ? `<br><b>Accepted by:</b> ${task.acceptedBy}` : "";
-
       div.innerHTML = `
-        <b>${task.trailer}</b> — ${task.type}
-        ${bayLine}
+        <b>${task.trailer}</b> — ${task.type}<br>
+        ${task.bay ? "Bay "+task.bay : ""}
         <br>${task.from || ""} ${task.to ? "→ " + task.to : ""}
         <br><i>${task.status}</i>
-        ${acceptedLine}
+        ${task.acceptedBy ? `<br><b>Accepted by:</b> ${task.acceptedBy}` : ""}
       `;
 
       tasksDiv.appendChild(div);
+
     });
+
   });
+
 }
 
-window.onload = loadTasks;
+function loadPowerConnections(){
+
+  const div = document.getElementById("powerConnections");
+
+  if(!div) return;
+
+  db.ref("powerConnections").on("value", snapshot => {
+
+    div.innerHTML="";
+
+    snapshot.forEach(child=>{
+
+      const p = child.val();
+      const shunter = child.key;
+
+      const row = document.createElement("div");
+
+      row.className="task";
+
+      row.innerHTML=`
+      ⚡ ${p.bay} — ${p.trailer} — ${shunter}
+      <br>
+      <button onclick="finishPower('${shunter}')">
+      FINISH POWER
+      </button>
+      `;
+
+      div.appendChild(row);
+
+    });
+
+  });
+
+}
+
+window.onload=function(){
+
+  loadTasks();
+  loadPowerConnections();
+
+};
