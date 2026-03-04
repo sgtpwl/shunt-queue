@@ -11,6 +11,10 @@ function addTask() {
     return;
   }
 
+  const button = event.target;
+  button.disabled = true;
+  button.innerText = "Submitting...";
+
   db.ref("tasks").push({
     trailer,
     from,
@@ -19,11 +23,25 @@ function addTask() {
     type,
     status: "waiting",
     created: Date.now()
+  }).then(() => {
+
+    button.innerText = "Task Added ✓";
+
+    setTimeout(()=>{
+      button.disabled = false;
+      button.innerText = "Submit Task";
+    },1500);
+
   });
 
 }
 
 function finishPower(shunter){
+
+  const button = event.target;
+
+  button.disabled = true;
+  button.innerText = "Finishing...";
 
   db.ref("powerConnections/"+shunter).update({
     status:"readyToDisconnect"
