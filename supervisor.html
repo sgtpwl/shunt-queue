@@ -13,9 +13,9 @@
 <input id="trailer" placeholder="Trailer number">
 
 <select id="type" onchange="updateForm()">
-  <option value="Move Trailer">Move Trailer</option>
-  <option value="Provide Power (DD)">Provide Power (DD)</option>
-  <option value="Remove Power (DD)">Remove Power (DD)</option>
+<option value="Move Trailer">Move Trailer</option>
+<option value="Provide Power (DD)">Provide Power (DD)</option>
+<option value="Remove Power (DD)">Remove Power (DD)</option>
 </select>
 
 <div id="moveFields">
@@ -28,6 +28,7 @@
 <div id="powerFields" style="display:none">
 
 <select id="bay">
+
 <option value="">Select Bay</option>
 
 <option>B1</option><option>B2</option><option>B3</option><option>B4</option><option>B5</option>
@@ -47,7 +48,7 @@
 
 </div>
 
-<button onclick="addTask()">Submit Task</button>
+<button onclick="addTask(this)">Submit Task</button>
 
 <h2>⚡ Active Power</h2>
 <div id="powerConnections"></div>
@@ -56,20 +57,20 @@
 
 function updateForm(){
 
-const type = document.getElementById("type").value;
+const type=document.getElementById("type").value;
 
-const moveFields = document.getElementById("moveFields");
-const powerFields = document.getElementById("powerFields");
+const move=document.getElementById("moveFields");
+const power=document.getElementById("powerFields");
 
-if(type === "Move Trailer"){
+if(type==="Move Trailer"){
 
-moveFields.style.display = "block";
-powerFields.style.display = "none";
+move.style.display="block";
+power.style.display="none";
 
 }else{
 
-moveFields.style.display = "none";
-powerFields.style.display = "block";
+move.style.display="none";
+power.style.display="block";
 
 }
 
