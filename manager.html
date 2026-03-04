@@ -1,22 +1,42 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Shunt Queue - Office</title>
+  <title>Shunt Queue - Manager</title>
   <link rel="stylesheet" href="style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
 
-<h1>Shunt Queue - Office</h1>
+<h1>Shunt Queue - Manager</h1>
 
 <input id="trailer" placeholder="Trailer number">
-<input id="from" placeholder="From">
-<input id="to" placeholder="To">
 
 <select id="type">
   <option>Move Trailer</option>
   <option>Provide Power (DD)</option>
   <option>Remove Power (DD)</option>
 </select>
+
+<!-- Bay dropdown for DD power work -->
+<select id="bay">
+  <option value="">Select Bay (B1–B25, C1–C26)</option>
+
+  <option>B1</option><option>B2</option><option>B3</option><option>B4</option><option>B5</option>
+  <option>B6</option><option>B7</option><option>B8</option><option>B9</option><option>B10</option>
+  <option>B11</option><option>B12</option><option>B13</option><option>B14</option><option>B15</option>
+  <option>B16</option><option>B17</option><option>B18</option><option>B19</option><option>B20</option>
+  <option>B21</option><option>B22</option><option>B23</option><option>B24</option><option>B25</option>
+
+  <option>C1</option><option>C2</option><option>C3</option><option>C4</option><option>C5</option>
+  <option>C6</option><option>C7</option><option>C8</option><option>C9</option><option>C10</option>
+  <option>C11</option><option>C12</option><option>C13</option><option>C14</option><option>C15</option>
+  <option>C16</option><option>C17</option><option>C18</option><option>C19</option><option>C20</option>
+  <option>C21</option><option>C22</option><option>C23</option><option>C24</option><option>C25</option>
+  <option>C26</option>
+</select>
+
+<input id="from" placeholder="From location (free text)">
+<input id="to" placeholder="To location (free text)">
 
 <button onclick="addTask()">Add Task</button>
 
@@ -27,6 +47,6 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
+
 </body>
 </html>
-
