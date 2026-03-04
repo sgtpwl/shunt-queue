@@ -19,20 +19,10 @@
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="config.js"></script>
 
 <script>
 
-const firebaseConfig = {
-apiKey: "AIzaSyACwPAzBK_TFOyIuuI0iNzy_9zW-CKA7m4",
-authDomain: "shunt-queue.firebaseapp.com",
-databaseURL: "https://shunt-queue-default-rtdb.europe-west1.firebasedatabase.app",
-projectId: "shunt-queue",
-storageBucket: "shunt-queue.appspot.com",
-messagingSenderId: "773776993625",
-appId: "1:773776993625:web:2082ee7a38be041bee7048"
-};
-
-firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 function logout(){
@@ -45,28 +35,33 @@ return localStorage.getItem("shunterName");
 }
 
 function acceptTask(id){
-
-db.ref("tasks/"+id).transaction(task => {
-
-if(task && task.status === "waiting"){
-task.status = "accepted";
-task.acceptedBy = getShunter();
-return task;
-}
-
-return;
-
+db.ref("tasks/"+id).update({
+status:"accepted",
+acceptedBy:getShunter()
 });
-
 }
 
 function completeTask(id){
 db.ref("tasks/"+id).remove();
 }
 
+function connectPower(task){
+
+const shunter = getShunter();
+
+db.ref("powerConnections/"+shunter).set({
+trailer: task.trailer,
+bay: task.bay,
+connectedAt: Date.now()
+});
+
+db.ref("tasks/"+task.id).remove();
+
+}
+
 function loadNextTask(){
 
-db.ref("tasks").on("value",snapshot=>{
+db.ref("tasks").on("value",function(snapshot){
 
 const shunter=getShunter();
 const taskDiv=document.getElementById("nextTask");
@@ -74,41 +69,63 @@ const taskDiv=document.getElementById("nextTask");
 let tasks=[];
 
 snapshot.forEach(child=>{
-let task=child.val();
-task.id=child.key;
-tasks.push(task);
+let t=child.val();
+t.id=child.key;
+tasks.push(t);
 });
 
 tasks.sort((a,b)=>a.created-b.created);
 
-// show my active job
-let myTask = tasks.find(t=>t.status==="accepted" && t.acceptedBy===shunter);
+let myTask=tasks.find(t=>t.status==="accepted" && t.acceptedBy===shunter);
 
 if(myTask){
 
+if(myTask.type==="Provide Power (DD)"){
+
 taskDiv.innerHTML=`
 <div class="task">
-<h2 style="font-size:40px">${myTask.trailer}</h2>
-<p style="font-size:28px"><strong>${myTask.type}</strong></p>
-<p style="font-size:24px">${myTask.from||""} ${myTask.to?"→ "+myTask.to:""}</p>
-<button onclick="completeTask('${myTask.id}')" style="width:90%;height:80px;font-size:28px">COMPLETE</button>
+<h2>${myTask.trailer}</h2>
+<p>Provide Power</p>
+<p>Bay ${myTask.bay}</p>
+<button onclick='connectPower(${JSON.stringify(myTask)})'
+style="width:90%;height:80px;font-size:28px">
+CONNECTED
+</button>
 </div>
 `;
 
 return;
 }
 
-// otherwise show next waiting job
-let next = tasks.find(t=>t.status==="waiting");
+taskDiv.innerHTML=`
+<div class="task">
+<h2>${myTask.trailer}</h2>
+<p>${myTask.type}</p>
+<p>${myTask.from||""} ${myTask.to?"→ "+myTask.to:""}</p>
+<button onclick="completeTask('${myTask.id}')"
+style="width:90%;height:80px;font-size:28px">
+COMPLETE
+</button>
+</div>
+`;
 
-if(next){
+return;
+}
+
+let nextTask=tasks.find(t=>t.status==="waiting");
+
+if(nextTask){
 
 taskDiv.innerHTML=`
 <div class="task">
-<h2 style="font-size:40px">${next.trailer}</h2>
-<p style="font-size:28px"><strong>${next.type}</strong></p>
-<p style="font-size:24px">${next.from||""} ${next.to?"→ "+next.to:""}</p>
-<button onclick="acceptTask('${next.id}')" style="width:90%;height:80px;font-size:28px">ACCEPT</button>
+<h2>${nextTask.trailer}</h2>
+<p>${nextTask.type}</p>
+<p>${nextTask.bay ? "Bay "+nextTask.bay : ""}</p>
+<p>${nextTask.from||""} ${nextTask.to?"→ "+nextTask.to:""}</p>
+<button onclick="acceptTask('${nextTask.id}')"
+style="width:90%;height:80px;font-size:28px">
+ACCEPT
+</button>
 </div>
 `;
 
@@ -121,16 +138,16 @@ taskDiv.innerHTML="No tasks waiting";
 
 }
 
-window.onload=()=>{
+window.onload=function(){
 
-const name=getShunter();
+const shunter=getShunter();
 
-if(!name){
+if(!shunter){
 window.location.href="shunter-login.html";
 return;
 }
 
-document.getElementById("shunterName").innerText="Shunter: "+name;
+document.getElementById("shunterName").innerText="Shunter: "+shunter;
 
 loadNextTask();
 
