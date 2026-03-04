@@ -58,7 +58,7 @@ db.ref("tasks/"+task.id).remove();
 
 }
 
-function disconnectPower(){
+function acknowledgePower(){
 
 const shunter=getShunter();
 
@@ -86,13 +86,13 @@ return;
 if(power.status==="readyToDisconnect"){
 
 div.innerHTML=`
-<h2>REMOVE POWER</h2>
+<h2>POWER COMPLETE</h2>
 <p>${power.trailer}</p>
 <p>Bay ${power.bay}</p>
 
-<button onclick="disconnectPower()"
+<button onclick="acknowledgePower()"
 style="width:90%;height:80px;font-size:28px">
-DISCONNECTED
+ACKNOWLEDGE
 </button>
 `;
 
@@ -115,7 +115,7 @@ t.id=child.key;
 tasks.push(t);
 });
 
-tasks.sort((a,b)=>a.created-b.created);
+tasks.sort((a,b)=>a.position-b.position);
 
 let myTask=tasks.find(t=>t.status==="accepted" && t.acceptedBy===shunter);
 
