@@ -42,9 +42,11 @@ function addTask(button) {
 
 }
 
+
+
 function moveUp(id){
 
-  db.ref("tasks").once("value", snapshot=>{
+  db.ref("tasks").once("value",snapshot=>{
 
     let tasks=[];
 
@@ -56,23 +58,27 @@ function moveUp(id){
 
     tasks.sort((a,b)=>a.position-b.position);
 
-    const index=tasks.findIndex(t=>t.id===id);
+    let index=tasks.findIndex(t=>t.id===id);
 
     if(index<=0) return;
 
-    const current=tasks[index];
-    const above=tasks[index-1];
+    const temp=tasks[index];
+    tasks[index]=tasks[index-1];
+    tasks[index-1]=temp;
 
-    db.ref("tasks/"+current.id+"/position").set(above.position);
-    db.ref("tasks/"+above.id+"/position").set(current.position);
+    tasks.forEach((t,i)=>{
+      db.ref("tasks/"+t.id+"/position").set(i+1);
+    });
 
   });
 
 }
 
+
+
 function moveDown(id){
 
-  db.ref("tasks").once("value", snapshot=>{
+  db.ref("tasks").once("value",snapshot=>{
 
     let tasks=[];
 
@@ -84,19 +90,23 @@ function moveDown(id){
 
     tasks.sort((a,b)=>a.position-b.position);
 
-    const index=tasks.findIndex(t=>t.id===id);
+    let index=tasks.findIndex(t=>t.id===id);
 
-    if(index===tasks.length-1) return;
+    if(index>=tasks.length-1) return;
 
-    const current=tasks[index];
-    const below=tasks[index+1];
+    const temp=tasks[index];
+    tasks[index]=tasks[index+1];
+    tasks[index+1]=temp;
 
-    db.ref("tasks/"+current.id+"/position").set(below.position);
-    db.ref("tasks/"+below.id+"/position").set(current.position);
+    tasks.forEach((t,i)=>{
+      db.ref("tasks/"+t.id+"/position").set(i+1);
+    });
 
   });
 
 }
+
+
 
 function finishPower(shunter, button){
 
@@ -113,13 +123,15 @@ function finishPower(shunter, button){
 
 }
 
+
+
 function loadTasks() {
 
+  const tasksDiv = document.getElementById("tasks");
+
+  if(!tasksDiv) return;
+
   db.ref("tasks").on("value", snapshot => {
-
-    const tasksDiv = document.getElementById("tasks");
-
-    if(!tasksDiv) return;
 
     tasksDiv.innerHTML = "";
 
@@ -159,6 +171,8 @@ function loadTasks() {
 
 }
 
+
+
 function loadPowerConnections(){
 
   const div=document.getElementById("powerConnections");
@@ -194,9 +208,87 @@ function loadPowerConnections(){
 
 }
 
+
+
+function loadShunterStatus(){
+
+  const div=document.getElementById("shunterStatus");
+
+  if(!div) return;
+
+  function refresh(){
+
+    db.ref("shunters").once("value", shunterSnap=>{
+
+      let shunters={};
+
+      shunterSnap.forEach(child=>{
+        shunters[child.key]=true;
+      });
+
+      db.ref("powerConnections").once("value", powerSnap=>{
+
+        let power={};
+
+        powerSnap.forEach(child=>{
+          power[child.key]=child.val();
+        });
+
+        db.ref("tasks").once("value", taskSnap=>{
+
+          let busy={};
+
+          taskSnap.forEach(child=>{
+            const t=child.val();
+            if(t.status==="accepted"){
+              busy[t.acceptedBy]=t;
+            }
+          });
+
+          div.innerHTML="";
+
+          Object.keys(shunters).forEach(name=>{
+
+            const row=document.createElement("div");
+
+            if(power[name]){
+
+              row.innerHTML=`${name} — ⚡ Power ${power[name].bay}`;
+
+            }else if(busy[name]){
+
+              row.innerHTML=`${name} — Moving ${busy[name].trailer}`;
+
+            }else{
+
+              row.innerHTML=`${name} — Available`;
+
+            }
+
+            div.appendChild(row);
+
+          });
+
+        });
+
+      });
+
+    });
+
+  }
+
+  db.ref("tasks").on("value",refresh);
+  db.ref("powerConnections").on("value",refresh);
+  db.ref("shunters").on("value",refresh);
+
+}
+
+
+
 window.onload=function(){
 
   loadTasks();
   loadPowerConnections();
+  loadShunterStatus();
 
 };
