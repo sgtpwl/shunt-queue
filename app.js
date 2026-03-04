@@ -216,7 +216,9 @@ const div=document.getElementById("shunterStatus");
 
 if(!div) return;
 
-db.ref("shunters").on("value",snapshot=>{
+function refresh(){
+
+db.ref("shunters").once("value",snapshot=>{
 
 div.innerHTML="";
 
@@ -237,7 +239,13 @@ row.innerHTML=`${name} — Moving trailer`;
 
 }else if(data.status==="break"){
 
-row.innerHTML=`${name} — Break`;
+let minutes=0;
+
+if(data.breakStart){
+minutes=Math.floor((Date.now()-data.breakStart)/60000);
+}
+
+row.innerHTML=`${name} — Break (${minutes} min)`;
 
 }else{
 
@@ -250,6 +258,12 @@ div.appendChild(row);
 });
 
 });
+
+}
+
+refresh();
+
+setInterval(refresh,60000);
 
 }
 
