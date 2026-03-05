@@ -21,10 +21,10 @@ background:#2d6cdf;
 color:white;
 border:none;
 padding:10px 18px;
-font-size:16px;
+font-size:15px;
 border-radius:4px;
 cursor:pointer;
-margin-bottom:20px;
+margin:5px;
 }
 
 button:hover{
@@ -32,7 +32,7 @@ background:#1f4fb3;
 }
 
 .section{
-margin-top:30px;
+margin-top:35px;
 }
 
 .vehicle{
@@ -53,6 +53,13 @@ border-radius:4px;
 font-weight:bold;
 }
 
+.adminPanel{
+background:white;
+padding:20px;
+border-radius:6px;
+box-shadow:0 1px 3px rgba(0,0,0,0.1);
+}
+
 </style>
 </head>
 
@@ -70,6 +77,21 @@ font-weight:bold;
 <div class="section">
 <h2>Alerts</h2>
 <div id="alerts"></div>
+</div>
+
+<div class="section">
+<h2>Admin Control Panel</h2>
+
+<div class="adminPanel">
+
+<button onclick="resetShunters()">Reset All Shunters</button>
+<button onclick="clearPower()">Clear Power Connections</button>
+<button onclick="clearStuckJobs()">Clear Stuck Jobs</button>
+<button onclick="clearEvents()">Clear Shift Events</button>
+<button onclick="generateTestJobs()">Generate Test Jobs</button>
+
+</div>
+
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -99,45 +121,41 @@ const container = document.getElementById("yardStatus");
 
 db.ref("shunters").on("value", snapshot => {
 
-container.innerHTML = "";
+container.innerHTML="";
 
-snapshot.forEach(child => {
+snapshot.forEach(child=>{
 
 const v = child.val();
 const vehicle = child.key;
 
 const div = document.createElement("div");
-div.className = "vehicle";
+div.className="vehicle";
 
 if(v.onBreak){
 
-div.innerText = vehicle + " — On Break";
-
+div.innerText = vehicle+" — On Break";
 container.appendChild(div);
 
 }
 
 else if(v.currentTask){
 
-const taskId = v.currentTask;
+const span=document.createElement("span");
+span.id="timer_"+vehicle;
 
-const span = document.createElement("span");
-span.id = "timer_" + vehicle;
-
-div.innerHTML = vehicle + " — Working task " + taskId + " (";
+div.innerHTML = vehicle+" — Working task "+v.currentTask+" (";
 div.appendChild(span);
-div.innerHTML += ")";
+div.innerHTML+=")";
 
 container.appendChild(div);
 
-startTimer(vehicle,taskId);
+startTimer(vehicle,v.currentTask);
 
 }
 
 else{
 
-div.innerText = vehicle + " — Available";
-
+div.innerText = vehicle+" — Available";
 container.appendChild(div);
 
 }
@@ -153,28 +171,26 @@ container.appendChild(div);
 
 function startTimer(vehicle,taskId){
 
-db.ref("tasks/" + taskId).once("value", snapshot => {
+db.ref("tasks/"+taskId).once("value",snap=>{
 
-const t = snapshot.val();
-
+const t=snap.val();
 if(!t || !t.startedAt) return;
 
-const start = t.startedAt;
+const start=t.startedAt;
 
 setInterval(()=>{
 
-const elapsed = Math.floor((Date.now() - start) / 1000);
+const elapsed=Math.floor((Date.now()-start)/1000);
+const mins=Math.floor(elapsed/60);
+const secs=elapsed%60;
 
-const mins = Math.floor(elapsed/60);
-const secs = elapsed % 60;
-
-const display =
-String(mins).padStart(2,"0") + ":" +
+const display=
+String(mins).padStart(2,"0")+":"+
 String(secs).padStart(2,"0");
 
-const el = document.getElementById("timer_"+vehicle);
+const el=document.getElementById("timer_"+vehicle);
 
-if(el) el.innerText = display;
+if(el) el.innerText=display;
 
 },1000);
 
@@ -183,34 +199,30 @@ if(el) el.innerText = display;
 }
 
 
-/* ALERT SYSTEM */
+/* ALERTS */
 
 function checkAlerts(){
 
-const alertBox = document.getElementById("alerts");
-alertBox.innerHTML = "";
+const box=document.getElementById("alerts");
+box.innerHTML="";
 
-db.ref("tasks").once("value", snapshot => {
+db.ref("tasks").once("value",snap=>{
 
-snapshot.forEach(child => {
+snap.forEach(child=>{
 
-const t = child.val();
+const t=child.val();
 
-if(t.status === "active" && t.startedAt){
+if(t.status==="active" && t.startedAt){
 
-const runningTime = (Date.now() - t.startedAt)/60000;
+const mins=(Date.now()-t.startedAt)/60000;
 
-if(runningTime > 15){
+if(mins>15){
 
-const div = document.createElement("div");
-div.className = "alert";
+const div=document.createElement("div");
+div.className="alert";
+div.innerText="🚨 Task "+child.key+" running "+Math.round(mins)+" minutes";
 
-div.innerText =
-"🚨 Task "+child.key+
-" running "+Math.round(runningTime)+
-" minutes";
-
-alertBox.appendChild(div);
+box.appendChild(div);
 
 }
 
@@ -223,34 +235,111 @@ alertBox.appendChild(div);
 }
 
 
-/* CSV EXPORT */
+/* ADMIN TOOLS */
+
+function resetShunters(){
+
+if(!confirm("Reset all shunters?")) return;
+
+db.ref("shunters").set({
+S1:{},
+S2:{},
+S3:{},
+S4:{},
+SPARE:{}
+});
+
+}
+
+function clearPower(){
+
+if(!confirm("Clear power connections?")) return;
+
+db.ref("powerConnections").remove();
+
+}
+
+function clearStuckJobs(){
+
+db.ref("tasks").once("value",snap=>{
+
+snap.forEach(child=>{
+
+const t=child.val();
+
+if(t.status==="active" && t.startedAt){
+
+const mins=(Date.now()-t.startedAt)/60000;
+
+if(mins>15){
+
+db.ref("tasks/"+child.key+"/status").set("pending");
+
+}
+
+}
+
+});
+
+});
+
+}
+
+function clearEvents(){
+
+if(!confirm("Delete all shift events?")) return;
+
+db.ref("shiftEvents").remove();
+
+}
+
+function generateTestJobs(){
+
+for(let i=1;i<=5;i++){
+
+const id=db.ref("tasks").push().key;
+
+db.ref("tasks/"+id).set({
+
+bay:"TEST-"+i,
+trailer:"SIM-"+Math.floor(Math.random()*999),
+status:"pending",
+createdAt:Date.now()
+
+});
+
+}
+
+}
+
+
+/* CSV */
 
 function downloadCSV(){
 
-db.ref("shiftEvents").once("value", snapshot => {
+db.ref("shiftEvents").once("value",snap=>{
 
-let csv = "Time,Vehicle,Driver,Event,Details\n";
+let csv="Time,Vehicle,Driver,Event,Details\n";
 
-snapshot.forEach(child => {
+snap.forEach(child=>{
 
-const e = child.val();
+const e=child.val();
 
-csv +=
-(e.time || "") + "," +
-(e.vehicle || "") + "," +
-(e.driver || "") + "," +
-(e.event || "") + "," +
-(e.details || "") +
-"\n";
+csv+=
+(e.time||"")+","+
+(e.vehicle||"")+","+
+(e.driver||"")+","+
+(e.event||"")+","+
+(e.details||"")+"\n";
 
 });
 
-const blob = new Blob([csv],{type:"text/csv"});
-const url = URL.createObjectURL(blob);
+const blob=new Blob([csv],{type:"text/csv"});
+const url=URL.createObjectURL(blob);
 
-const a = document.createElement("a");
-a.href = url;
-a.download = "shift-report.csv";
+const a=document.createElement("a");
+a.href=url;
+a.download="shift-report.csv";
 a.click();
 
 });
@@ -258,12 +347,8 @@ a.click();
 }
 
 
-/* INITIAL LOAD */
-
 loadYardStatus();
 checkAlerts();
-
-/* ALERT CHECK EVERY MINUTE */
 
 setInterval(checkAlerts,60000);
 
