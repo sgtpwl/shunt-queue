@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>Shunt System Admin</title>
+
+<link rel="stylesheet" href="style.css">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+</head>
+
+<body>
+
+<h1>Admin Dashboard</h1>
+
+<h2>Completed Tasks</h2>
+
+<div id="completedTasks"></div>
+
+<h2>Shunter Performance</h2>
+
+<div id="shunterStats"></div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<script src="config.js"></script>
+
+<script>
+
+function minutes(ms){
+
+return Math.floor(ms/60000);
+
+}
+
+function loadCompletedTasks(){
+
+const div=document.getElementById("completedTasks");
+
+db.ref("tasks").on("value",snapshot=>{
+
+div.innerHTML="";
+
+let tasks=[];
+
+snapshot.forEach(child=>{
+
+let t=child.val();
+t.id=child.key;
+
+if(t.status==="completed") tasks.push(t);
+
+});
+
+tasks.sort((a,b)=>b.completedTime-a.completedTime);
+
+tasks.forEach(t=>{
+
+let startDelay = t.acceptedTime - t.created;
+let duration = t.completedTime - t.acceptedTime;
+
+const row=document.createElement("div");
+
+row.className="task";
+
+row.innerHTML=`
+<b>${t.trailer}</b>
+<br>
+Vehicle: ${t.acceptedBy}
+<br>
+Start Delay: ${minutes(startDelay)} min
+<br>
+Duration: ${minutes(duration)} min
+`;
+
+div.appendChild(row);
+
+});
+
+});
+
+}
+
+function loadShunterStats(){
+
+const div=document.getElementById("shunterStats");
+
+db.ref("tasks").on("value",snapshot=>{
+
+let stats={};
+
+snapshot.forEach(child=>{
+
+const t=child.val();
+
+if(t.status!=="completed") return;
+
+const v=t.acceptedBy;
+
+if(!stats[v]){
+
+stats[v]={
+jobs:0,
+duration:0,
+delay:0
+};
+
+}
+
+stats[v].jobs++;
+
+stats[v].duration += (t.completedTime - t.acceptedTime);
+
+stats[v].delay += (t.acceptedTime - t.created);
+
+});
+
+div.innerHTML="";
+
+Object.keys(stats).forEach(v=>{
+
+const s=stats[v];
+
+const avgDuration = minutes(s.duration/s.jobs);
+const avgDelay = minutes(s.delay/s.jobs);
+
+const row=document.createElement("div");
+
+row.className="task";
+
+row.innerHTML=`
+<b>${v}</b>
+<br>
+Jobs: ${s.jobs}
+<br>
+Avg Start Delay: ${avgDelay} min
+<br>
+Avg Job Time: ${avgDuration} min
+`;
+
+div.appendChild(row);
+
+});
+
+});
+
+}
+
+loadCompletedTasks();
+loadShunterStats();
+
+</script>
+
+</body>
+</html>
