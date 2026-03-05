@@ -1,93 +1,194 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Shunt Queue - Manager</title>
+<title>Admin Dashboard</title>
 <link rel="stylesheet" href="style.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 
 <body>
 
-<h1>Shunt Queue - Manager</h1>
+<h1>Admin Dashboard</h1>
 
-<input id="trailer" placeholder="Trailer number">
+<h2>Alerts</h2>
+<div id="alerts"></div>
 
-<select id="type" onchange="updateForm()">
-<option value="Move Trailer">Move Trailer</option>
-<option value="Provide Power (DD)">Provide Power (DD)</option>
-<option value="Remove Power (DD)">Remove Power (DD)</option>
-</select>
+<h2>Live Yard Status</h2>
+<div id="yardStatus"></div>
 
-<div id="moveFields">
+<h2>System Stats</h2>
+<div id="systemStats"></div>
 
-<input id="from" placeholder="From location">
-<input id="to" placeholder="To location">
+<h2>Shunter Performance</h2>
+<div id="shunterStats"></div>
 
-</div>
+<h2>Completed Tasks</h2>
+<div id="completedTasks"></div>
 
-<div id="powerFields" style="display:none">
-
-<select id="bay">
-
-<option value="">Select Bay</option>
-
-<option>B1</option><option>B2</option><option>B3</option><option>B4</option><option>B5</option>
-<option>B6</option><option>B7</option><option>B8</option><option>B9</option><option>B10</option>
-<option>B11</option><option>B12</option><option>B13</option><option>B14</option><option>B15</option>
-<option>B16</option><option>B17</option><option>B18</option><option>B19</option><option>B20</option>
-<option>B21</option><option>B22</option><option>B23</option><option>B24</option><option>B25</option>
-
-<option>C1</option><option>C2</option><option>C3</option><option>C4</option><option>C5</option>
-<option>C6</option><option>C7</option><option>C8</option><option>C9</option><option>C10</option>
-<option>C11</option><option>C12</option><option>C13</option><option>C14</option><option>C15</option>
-<option>C16</option><option>C17</option><option>C18</option><option>C19</option><option>C20</option>
-<option>C21</option><option>C22</option><option>C23</option><option>C24</option><option>C25</option>
-<option>C26</option>
-
-</select>
-
-</div>
-
-<button onclick="addTask(this)">Add Task</button>
-
-<h2>SHUNTERS</h2>
-<div id="shunterStatus"></div>
-
-<h2>⚡ Active Power</h2>
-<div id="powerConnections"></div>
-
-<h2>Queue</h2>
-<div id="tasks"></div>
-
-<script>
-
-function updateForm(){
-
-const type=document.getElementById("type").value;
-
-const move=document.getElementById("moveFields");
-const power=document.getElementById("powerFields");
-
-if(type==="Move Trailer"){
-
-move.style.display="block";
-power.style.display="none";
-
-}else{
-
-move.style.display="none";
-power.style.display="block";
-
-}
-
-}
-
-</script>
+<button onclick="downloadCSV()">Download CSV</button>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script src="config.js"></script>
-<script src="app.js"></script>
+
+<script>
+
+let tasksData=[];
+let powerData={};
+let shuntersData={};
+
+function minutes(ms){
+
+return Math.floor(ms/60000);
+
+}
+
+function loadAll(){
+
+db.ref("tasks").on("value",snap=>{
+
+tasksData=[];
+
+snap.forEach(child=>{
+
+let t=child.val();
+t.id=child.key;
+tasksData.push(t);
+
+});
+
+renderStats();
+renderCompleted();
+renderYard();
+
+});
+
+db.ref("powerConnections").on("value",snap=>{
+
+powerData={};
+
+snap.forEach(child=>{
+
+powerData[child.key]=child.val();
+
+});
+
+renderYard();
+
+});
+
+db.ref("shunters").on("value",snap=>{
+
+shuntersData={};
+
+snap.forEach(child=>{
+
+shuntersData[child.key]=child.val();
+
+});
+
+renderYard();
+
+});
+
+}
+
+function renderYard(){
+
+const div=document.getElementById("yardStatus");
+div.innerHTML="";
+
+Object.keys(shuntersData).forEach(v=>{
+
+let s=shuntersData[v];
+
+let row=document.createElement("div");
+row.className="task";
+
+if(powerData[v] && powerData[v].status==="connected"){
+
+row.innerHTML=`${v} ⚡ Power Bay ${powerData[v].bay}`;
+
+}else if(s.status==="break"){
+
+row.innerHTML=`${v} Break`;
+
+}else{
+
+row.innerHTML=`${v} Available`;
+
+}
+
+div.appendChild(row);
+
+});
+
+}
+
+function renderCompleted(){
+
+const div=document.getElementById("completedTasks");
+div.innerHTML="";
+
+tasksData.filter(t=>t.status==="completed").forEach(t=>{
+
+let delay=minutes(t.acceptedTime-t.created);
+let dur=minutes(t.completedTime-t.acceptedTime);
+
+let row=document.createElement("div");
+row.className="task";
+
+row.innerHTML=`
+Trailer ${t.trailer}
+Vehicle ${t.acceptedBy}
+Driver ${t.driver}
+Delay ${delay} min
+Duration ${dur} min
+`;
+
+div.appendChild(row);
+
+});
+
+}
+
+function renderStats(){
+
+let total=0;
+
+tasksData.forEach(t=>{
+
+if(t.status==="completed") total++;
+
+});
+
+document.getElementById("systemStats").innerHTML=`Tasks Completed ${total}`;
+
+}
+
+function downloadCSV(){
+
+let csv="Trailer,Vehicle,Driver\n";
+
+tasksData.filter(t=>t.status==="completed").forEach(t=>{
+
+csv+=`${t.trailer},${t.acceptedBy},${t.driver}\n`;
+
+});
+
+let blob=new Blob([csv]);
+let url=URL.createObjectURL(blob);
+
+let a=document.createElement("a");
+a.href=url;
+a.download="report.csv";
+a.click();
+
+}
+
+loadAll();
+
+</script>
 
 </body>
 </html>
