@@ -1,378 +1,157 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Shunt System Admin</title>
-  <link rel="stylesheet" href="style.css">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<title>Admin Dashboard</title>
+
+<style>
+body{
+    font-family: Arial, sans-serif;
+    margin:40px;
+    background:#f5f5f5;
+}
+
+h1{
+    margin-bottom:30px;
+}
+
+button{
+    background:#2d6cdf;
+    color:white;
+    border:none;
+    padding:10px 18px;
+    font-size:16px;
+    border-radius:4px;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#1f4fb3;
+}
+
+.section{
+    margin-top:30px;
+}
+
+.vehicle{
+    background:white;
+    padding:14px;
+    margin-bottom:10px;
+    border-radius:6px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.1);
+    font-size:16px;
+}
+
+.alert{
+    background:#ffefef;
+    border-left:6px solid red;
+    padding:12px;
+    margin-bottom:10px;
+    border-radius:4px;
+}
+</style>
 </head>
 
 <body>
 
 <h1>Admin Dashboard</h1>
 
-
-
-setInterval(checkAlerts,60000);
-checkAlerts();
-
-  
 <button onclick="downloadCSV()">Download CSV Report</button>
 
+<div class="section">
 <h2>Live Yard Status</h2>
 <div id="yardStatus"></div>
+</div>
 
-<h2>System Stats</h2>
-<div id="systemStats"></div>
+<div class="section">
+<h2>Alerts</h2>
+<div id="alerts"></div>
+</div>
 
-<h2>Shunter Performance</h2>
-<div id="shunterStats"></div>
-
-<h2>Completed Tasks</h2>
-<div id="completedTasks"></div>
-
-<h2>Shift Timeline</h2>
-<div id="timeline"></div>
-
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-<script src="config.js"></script>
 
 <script>
-  function minutes(ms){
-    return Math.floor(ms/60000);
-  }
 
-  function time(ts){
-    return new Date(ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-  }
+/* FIREBASE CONFIG */
 
-  // We keep this list so CSV export works.
-  let completedList = [];
+const firebaseConfig = {
+apiKey: "YOURKEY",
+authDomain: "YOURPROJECT.firebaseapp.com",
+databaseURL: "https://YOURPROJECT-default-rtdb.firebaseio.com",
+projectId: "YOURPROJECT",
+storageBucket: "YOURPROJECT.appspot.com",
+messagingSenderId: "XXXX",
+appId: "XXXX"
+};
 
-  // Cached live data for yard status.
-  let shuntersData = {};
-  let powerData = {};
-  let tasksData = [];
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-  function loadAll(){
-    // 1) Shunters live
-    db.ref("shunters").on("value", snap => {
-      shuntersData = {};
-      snap.forEach(child => {
-        shuntersData[child.key] = child.val() || {};
-      });
-      renderLiveYardStatus();
-    });
 
-    // 2) Power live
-    db.ref("powerConnections").on("value", snap => {
-      powerData = {};
-      snap.forEach(child => {
-        powerData[child.key] = child.val() || {};
-      });
-      renderLiveYardStatus();
-    });
+/* LIVE YARD STATUS */
 
-    // 3) Tasks live (for reporting + yard status)
-    db.ref("tasks").on("value", snap => {
-      tasksData = [];
-      snap.forEach(child => {
-        let t = child.val() || {};
-        t.id = child.key;
-        tasksData.push(t);
-      });
+function loadYardStatus(){
 
-      const completed = tasksData.filter(t => t.status === "completed");
-      completedList = completed;
+const container = document.getElementById("yardStatus");
 
-      showCompleted(completed);
-      showStats(completed);
-      showShunterStats(completed);
-      showTimeline(tasksData);
+db.ref("shunters").on("value", snapshot => {
 
-      renderLiveYardStatus();
-    });
+container.innerHTML = "";
 
-    // Keep break minutes ticking without refresh
-    setInterval(renderLiveYardStatus, 60000);
-  }
+snapshot.forEach(child => {
 
-  function renderLiveYardStatus(){
-    const div = document.getElementById("yardStatus");
-    if(!div) return;
+const v = child.val();
+const vehicle = child.key;
 
-    // Build lookup of accepted (in-progress) tasks by vehicle
-    const acceptedByVehicle = {};
-    tasksData.forEach(t => {
-      if(t.status === "accepted" && t.acceptedBy){
-        acceptedByVehicle[t.acceptedBy] = t;
-      }
-    });
+let status = "Available";
 
-    // Show vehicles we know about (from shunters), plus any that appear in power/tasks just in case.
-    const vehicles = new Set([
-      ...Object.keys(shuntersData),
-      ...Object.keys(powerData),
-      ...Object.keys(acceptedByVehicle),
-    ]);
+if(v.onBreak) status = "On Break";
+if(v.currentTask) status = "Working task " + v.currentTask;
 
-    div.innerHTML = "";
+const div = document.createElement("div");
+div.className = "vehicle";
+div.innerText = vehicle + " — " + status;
 
-    if(vehicles.size === 0){
-      div.innerHTML = "No vehicles logged in";
-      return;
-    }
+container.appendChild(div);
 
-    // Sort nicely (S1..S4 then SPARE)
-    const sorted = Array.from(vehicles).sort((a,b)=>{
-      const order = (v)=>{
-        if(v === "S1") return 1;
-        if(v === "S2") return 2;
-        if(v === "S3") return 3;
-        if(v === "S4") return 4;
-        if(v === "SPARE") return 99;
-        return 50;
-      };
-      return order(a) - order(b) || a.localeCompare(b);
-    });
+});
 
-    sorted.forEach(v => {
-      const s = shuntersData[v] || {};
-      const row = document.createElement("div");
-      row.className = "task";
+});
 
-      // Priority of display:
-      // 1) Power connection (most important)
-      // 2) Accepted task
-      // 3) Break
-      // 4) Available/Unknown
-      if(powerData[v]){
-        const p = powerData[v];
-        row.innerHTML = `<b>${v}</b> — ⚡ Power Bay ${p.bay} (${p.trailer})`;
-      } else if(acceptedByVehicle[v]){
-        const t = acceptedByVehicle[v];
-        row.innerHTML = `<b>${v}</b> — Working (${t.trailer})`;
-      } else if(s.status === "break"){
-        let mins = 0;
-        if(s.breakStart){
-          mins = minutes(Date.now() - s.breakStart);
-        }
-        row.innerHTML = `<b>${v}</b> — Break (${mins} min)`;
-      } else if(s.status === "available" || s.status === "busy" || s.status === "power"){
-        // If status says busy/power but we have no record, still show something sensible
-        if(s.status === "busy"){
-          row.innerHTML = `<b>${v}</b> — Busy`;
-        } else if(s.status === "power"){
-          row.innerHTML = `<b>${v}</b> — ⚡ Power`;
-        } else {
-          row.innerHTML = `<b>${v}</b> — Available`;
-        }
-      } else {
-        // If they appear only via power/tasks, but not in shunters tree
-        row.innerHTML = `<b>${v}</b> — (Not registered)`;
-      }
+}
 
-      div.appendChild(row);
-    });
-  }
 
-  function showCompleted(tasks){
-    const div=document.getElementById("completedTasks");
-    div.innerHTML="";
-
-    tasks.sort((a,b)=>(b.completedTime||0)-(a.completedTime||0));
-
-    tasks.forEach(t=>{
-      const delay = (t.acceptedTime && t.created) ? (t.acceptedTime - t.created) : 0;
-      const duration = (t.completedTime && t.acceptedTime) ? (t.completedTime - t.acceptedTime) : 0;
-
-      const row=document.createElement("div");
-      row.className="task";
-
-      row.innerHTML=`
-        <b>${t.trailer || ""}</b><br>
-        Vehicle: ${t.acceptedBy || ""}<br>
-        Start Delay: ${minutes(delay)} min<br>
-        Duration: ${minutes(duration)} min
-      `;
-
-      div.appendChild(row);
-    });
-  }
-
-  function showStats(tasks){
-    const div=document.getElementById("systemStats");
-
-    let todayCount=0;
-    let totalDuration=0;
-    let totalDelay=0;
-    let powerJobs=0;
-
-    const todayStart = new Date().setHours(0,0,0,0);
-
-    tasks.forEach(t=>{
-      if((t.completedTime||0) > todayStart){
-        todayCount++;
-        if(t.completedTime && t.acceptedTime) totalDuration += (t.completedTime - t.acceptedTime);
-        if(t.acceptedTime && t.created) totalDelay += (t.acceptedTime - t.created);
-        if(t.type==="Provide Power (DD)") powerJobs++;
-      }
-    });
-
-    const avgDur = todayCount ? minutes(totalDuration/todayCount) : 0;
-    const avgDelay = todayCount ? minutes(totalDelay/todayCount) : 0;
-
-    div.innerHTML=`
-      Tasks Today: ${todayCount}<br>
-      Average Job Time: ${avgDur} min<br>
-      Average Start Delay: ${avgDelay} min<br>
-      Power Jobs: ${powerJobs}
-    `;
-  }
-
-  function showShunterStats(tasks){
-    const div=document.getElementById("shunterStats");
-
-    let stats={};
-
-    // Sort by completion time so idle calculations make sense
-    const sorted = [...tasks].sort((a,b)=>(a.completedTime||0)-(b.completedTime||0));
-
-    sorted.forEach(t=>{
-      const v=t.acceptedBy;
-      if(!v) return;
-
-      if(!stats[v]){
-        stats[v]={ jobs:0, duration:0, delay:0, idle:0, lastComplete:null };
-      }
-
-      stats[v].jobs++;
-
-      if(t.completedTime && t.acceptedTime) stats[v].duration += (t.completedTime - t.acceptedTime);
-      if(t.acceptedTime && t.created) stats[v].delay += (t.acceptedTime - t.created);
-
-      if(stats[v].lastComplete && t.acceptedTime){
-        stats[v].idle += (t.acceptedTime - stats[v].lastComplete);
-      }
-
-      if(t.completedTime) stats[v].lastComplete = t.completedTime;
-    });
-
-    div.innerHTML="";
-
-    Object.keys(stats).sort().forEach(v=>{
-      const s=stats[v];
-      const avgDur = s.jobs ? minutes(s.duration/s.jobs) : 0;
-      const avgDelay = s.jobs ? minutes(s.delay/s.jobs) : 0;
-      const avgIdle = s.jobs>1 ? minutes(s.idle/(s.jobs-1)) : 0;
-
-      const row=document.createElement("div");
-      row.className="task";
-
-      row.innerHTML=`
-        <b>${v}</b><br>
-        Jobs: ${s.jobs}<br>
-        Avg Start Delay: ${avgDelay} min<br>
-        Avg Job Time: ${avgDur} min<br>
-        Avg Idle Time: ${avgIdle} min
-      `;
-
-      div.appendChild(row);
-    });
-  }
-
-  function showTimeline(allTasks){
-    const div=document.getElementById("timeline");
-
-    const events=[];
-
-    allTasks.forEach(t=>{
-      if(t.created){
-        events.push({ time:t.created, text:`Task created — ${t.trailer || ""}` });
-      }
-      if(t.acceptedTime){
-        events.push({ time:t.acceptedTime, text:`${t.acceptedBy || ""} accepted — ${t.trailer || ""}` });
-      }
-      if(t.completedTime){
-        events.push({ time:t.completedTime, text:`${t.acceptedBy || ""} completed — ${t.trailer || ""}` });
-      }
-    });
-
-    events.sort((a,b)=>a.time-b.time);
-
-    div.innerHTML="";
-
-    events.forEach(e=>{
-      const row=document.createElement("div");
-      row.className="task";
-      row.innerHTML = `${time(e.time)} — ${e.text}`;
-      div.appendChild(row);
-    });
-  }
-
-  function downloadCSV(){
-    let csv="Trailer,Vehicle,StartDelayMinutes,DurationMinutes\n";
-
-    completedList.forEach(t=>{
-      const delay = (t.acceptedTime && t.created) ? minutes(t.acceptedTime - t.created) : 0;
-      const duration = (t.completedTime && t.acceptedTime) ? minutes(t.completedTime - t.acceptedTime) : 0;
-      csv += `${t.trailer || ""},${t.acceptedBy || ""},${delay},${duration}\n`;
-    });
-
-    const blob=new Blob([csv],{type:'text/csv'});
-    const url=URL.createObjectURL(blob);
-
-    const a=document.createElement("a");
-    a.href=url;
-    a.download="shunt-report.csv";
-    a.click();
-  }
+/* ALERT SYSTEM */
 
 function checkAlerts(){
 
-const alerts=[];
+const alertBox = document.getElementById("alerts");
+alertBox.innerHTML = "";
 
-const now=Date.now();
+db.ref("tasks").once("value", snapshot => {
 
-tasksData.forEach(t=>{
+snapshot.forEach(child => {
 
-if(t.status==="waiting" && t.created){
+const t = child.val();
 
-const wait=(now-t.created)/60000;
+if(t.status === "active" && t.startedAt){
 
-if(wait>10){
+const runningTime = (Date.now() - t.startedAt) / 60000;
 
-alerts.push(`⚠ Trailer ${t.trailer} waiting ${Math.floor(wait)} min`);
+if(runningTime > 15){
 
-}
+const div = document.createElement("div");
+div.className = "alert";
 
-}
+div.innerText =
+"⚠ Task " + child.key +
+" running " +
+Math.round(runningTime) +
+" minutes";
 
-if(t.status==="accepted" && t.acceptedTime){
-
-const dur=(now-t.acceptedTime)/60000;
-
-if(dur>30){
-
-alerts.push(`⚠ ${t.acceptedBy} working ${Math.floor(dur)} min`);
-
-}
-
-}
-
-});
-
-Object.keys(powerData).forEach(v=>{
-
-const p=powerData[v];
-
-if(p.status==="connected" && p.time){
-
-const dur=(now-p.time)/60000;
-
-if(dur>45){
-
-alerts.push(`⚠ ${v} power connected ${Math.floor(dur)} min`);
+alertBox.appendChild(div);
 
 }
 
@@ -380,17 +159,55 @@ alerts.push(`⚠ ${v} power connected ${Math.floor(dur)} min`);
 
 });
 
-const div=document.getElementById("alerts");
-
-div.innerHTML=alerts.join("<br>");
+});
 
 }
 
 
+/* CSV EXPORT */
+
+function downloadCSV(){
+
+db.ref("shiftEvents").once("value", snapshot => {
+
+let csv = "Time,Vehicle,Driver,Event,Details\n";
+
+snapshot.forEach(child => {
+
+const e = child.val();
+
+csv +=
+e.time + "," +
+e.vehicle + "," +
+e.driver + "," +
+e.event + "," +
+(e.details || "") +
+"\n";
+
+});
+
+const blob = new Blob([csv], { type: "text/csv" });
+const url = URL.createObjectURL(blob);
+
+const a = document.createElement("a");
+a.href = url;
+a.download = "shift-report.csv";
+a.click();
+
+});
+
+}
 
 
-  
-  loadAll();
+/* INITIAL LOAD */
+
+loadYardStatus();
+checkAlerts();
+
+/* RUN ALERT CHECK EVERY MINUTE */
+
+setInterval(checkAlerts,60000);
+
 </script>
 
 </body>
