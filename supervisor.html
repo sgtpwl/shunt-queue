@@ -1,87 +1,125 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Shunt Queue - Supervisor</title>
-<link rel="stylesheet" href="style.css">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<title>Supervisor</title>
+
+<style>
+body{
+font-family:Arial;
+margin:40px;
+}
+
+input,button{
+padding:10px;
+margin:5px;
+font-size:16px;
+}
+
+.task{
+background:#eee;
+padding:10px;
+margin:5px 0;
+}
+</style>
 </head>
 
 <body>
 
-<h1>Add Shunt Task (Supervisor)</h1>
+<h1>Create Task</h1>
 
-<input id="trailer" placeholder="Trailer number">
+<label>Bay</label><br>
+<input id="bay"><br>
 
-<select id="type" onchange="updateForm()">
-<option value="Move Trailer">Move Trailer</option>
-<option value="Provide Power (DD)">Provide Power (DD)</option>
-<option value="Remove Power (DD)">Remove Power (DD)</option>
-</select>
+<label>Trailer</label><br>
+<input id="trailer"><br>
 
-<div id="moveFields">
+<button onclick="addTask()">Add Task</button>
 
-<input id="from" placeholder="From location">
-<input id="to" placeholder="To location">
+<h2>Queue</h2>
+<div id="queue"></div>
 
-</div>
-
-<div id="powerFields" style="display:none">
-
-<select id="bay">
-
-<option value="">Select Bay</option>
-
-<option>B1</option><option>B2</option><option>B3</option><option>B4</option><option>B5</option>
-<option>B6</option><option>B7</option><option>B8</option><option>B9</option><option>B10</option>
-<option>B11</option><option>B12</option><option>B13</option><option>B14</option><option>B15</option>
-<option>B16</option><option>B17</option><option>B18</option><option>B19</option><option>B20</option>
-<option>B21</option><option>B22</option><option>B23</option><option>B24</option><option>B25</option>
-
-<option>C1</option><option>C2</option><option>C3</option><option>C4</option><option>C5</option>
-<option>C6</option><option>C7</option><option>C8</option><option>C9</option><option>C10</option>
-<option>C11</option><option>C12</option><option>C13</option><option>C14</option><option>C15</option>
-<option>C16</option><option>C17</option><option>C18</option><option>C19</option><option>C20</option>
-<option>C21</option><option>C22</option><option>C23</option><option>C24</option><option>C25</option>
-<option>C26</option>
-
-</select>
-
-</div>
-
-<button onclick="addTask(this)">Submit Task</button>
-
-<h2>⚡ Active Power</h2>
-<div id="powerConnections"></div>
-
-<script>
-
-function updateForm(){
-
-const type=document.getElementById("type").value;
-
-const move=document.getElementById("moveFields");
-const power=document.getElementById("powerFields");
-
-if(type==="Move Trailer"){
-
-move.style.display="block";
-power.style.display="none";
-
-}else{
-
-move.style.display="none";
-power.style.display="block";
-
-}
-
-}
-
-</script>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-<script src="config.js"></script>
-<script src="app.js"></script>
+
+<script>
+
+const firebaseConfig = {
+apiKey: "AIzaSyACwPAzBK_TFOyIuuI0iNzy_9zW-CKA7m4",
+authDomain: "shunt-queue.firebaseapp.com",
+databaseURL: "https://shunt-queue-default-rtdb.europe-west1.firebasedatabase.app",
+projectId: "shunt-queue",
+storageBucket: "shunt-queue.appspot.com",
+messagingSenderId: "773776993625",
+appId: "1:773776993625:web:2082ee7a38be041bee7048"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+
+function addTask(){
+
+const bay=document.getElementById("bay").value;
+const trailer=document.getElementById("trailer").value;
+
+if(!bay || !trailer){
+
+alert("Enter bay and trailer");
+return;
+
+}
+
+const id=db.ref("tasks").push().key;
+
+db.ref("tasks/"+id).set({
+
+bay:bay,
+trailer:trailer,
+status:"pending",
+createdAt:Date.now()
+
+});
+
+document.getElementById("bay").value="";
+document.getElementById("trailer").value="";
+
+}
+
+
+function loadQueue(){
+
+const container=document.getElementById("queue");
+
+db.ref("tasks").on("value",snap=>{
+
+container.innerHTML="";
+
+snap.forEach(child=>{
+
+const t=child.val();
+
+if(t.status==="pending"){
+
+const div=document.createElement("div");
+div.className="task";
+
+div.innerText="Bay "+t.bay+" - "+t.trailer;
+
+container.appendChild(div);
+
+}
+
+});
+
+});
+
+}
+
+loadQueue();
+
+</script>
 
 </body>
 </html>
