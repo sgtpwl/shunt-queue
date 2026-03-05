@@ -4,11 +4,28 @@
   <title>Manager - Shunt Queue</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="style.css">
+  <style>
+    .stat{ font-size:22px; margin:5px 0; }
+  </style>
 </head>
-
 <body>
 
 <h1>Manager</h1>
+
+<div id="who"></div>
+<button onclick="logout()">Logout</button>
+
+<hr>
+
+<h2>Yard Status</h2>
+<div class="stat">Queue Length: <span id="queue">0</span></div>
+<div class="stat">Priority Jobs: <span id="priority">0</span></div>
+<div class="stat">Active Jobs: <span id="active">0</span></div>
+<div class="stat">Shunters Available: <span id="available">0</span></div>
+<div class="stat">On Break: <span id="break">0</span></div>
+<div class="stat">Power Connections: <span id="power">0</span></div>
+
+<hr>
 
 <h2>Create Task</h2>
 
@@ -17,40 +34,39 @@
   <option value="power">Provide Power (DD)</option>
 </select>
 
-<div style="margin-top:8px;">
-  <label>
-    <input type="checkbox" id="priority">
-    Gatehouse Priority
-  </label>
-</div>
+<br><br>
 
-<div id="moveFields" style="margin-top:10px;">
+<label>
+  <input type="checkbox" id="priority">
+  Gatehouse Priority
+</label>
+
+<br><br>
+
+<div id="moveFields">
   <input id="trailer" placeholder="Trailer Number">
   <input id="from" placeholder="From Location">
   <input id="to" placeholder="To Location">
-
+  <br><br>
   <select id="loadType">
-    <option>Full Load</option>
-    <option>Empty Trailer</option>
-    <option selected>Trunk Trailer</option>
+    <option value="Full Load">Full Load</option>
+    <option value="Empty Trailer">Empty Trailer</option>
+    <option value="Trunk Trailer" selected>Trunk Trailer</option>
   </select>
 </div>
 
-<div id="powerFields" style="display:none; margin-top:10px;">
+<div id="powerFields" style="display:none">
   <input id="powerTrailer" placeholder="Trailer Number">
+  <br><br>
   <select id="bay">
     <option value="">Select Bay</option>
   </select>
 </div>
 
-<br>
+<br><br>
+
 <button onclick="addTask(this)">Submit Task</button>
 <p id="msg"></p>
-
-<hr>
-
-<h2>Queue</h2>
-<div id="tasks"></div>
 
 <hr>
 
@@ -59,30 +75,55 @@
 
 <hr>
 
+<h2>Queue</h2>
+<div id="tasks"></div>
+
+<hr>
+
 <h2>Shunters</h2>
-<div id="shunterStatus"></div>
+<div id="shunters"></div>
 
 <script>
-  function toggleTaskInputs(){
-    const type = document.getElementById("taskType").value;
-    document.getElementById("moveFields").style.display = (type==="move") ? "block" : "none";
-    document.getElementById("powerFields").style.display = (type==="power") ? "block" : "none";
+function requireLogin(){
+  const name = localStorage.getItem("userName");
+  const role = localStorage.getItem("userRole");
+  if(!name || role !== "Manager"){
+    window.location.href = "manager-login.html";
+    return false;
+  }
+  document.getElementById("who").innerHTML = "Logged in as: <b>" + name + "</b> (Manager)";
+  return true;
+}
+
+function logout(){
+  localStorage.removeItem("userName");
+  localStorage.removeItem("userRole");
+  window.location.href = "index.html";
+}
+
+function toggleTaskInputs(){
+  const type = document.getElementById("taskType").value;
+  document.getElementById("moveFields").style.display = (type==="move") ? "block" : "none";
+  document.getElementById("powerFields").style.display = (type==="power") ? "block" : "none";
+}
+
+function populateBays(){
+  const baySelect = document.getElementById("bay");
+
+  for(let i=1;i<=25;i++){
+    const opt=document.createElement("option");
+    opt.value="B"+i;
+    opt.innerText="B"+i;
+    baySelect.appendChild(opt);
   }
 
-  // populate bays
-  (function(){
-    const bay = document.getElementById("bay");
-    for (let i=1;i<=25;i++){
-      const o=document.createElement("option");
-      o.value="B"+i; o.innerText="B"+i;
-      bay.appendChild(o);
-    }
-    for (let i=1;i<=26;i++){
-      const o=document.createElement("option");
-      o.value="C"+i; o.innerText="C"+i;
-      bay.appendChild(o);
-    }
-  })();
+  for(let i=1;i<=26;i++){
+    const opt=document.createElement("option");
+    opt.value="C"+i;
+    opt.innerText="C"+i;
+    baySelect.appendChild(opt);
+  }
+}
 </script>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -91,115 +132,133 @@
 <script src="app.js"></script>
 
 <script>
-  function renderManagerQueue(){
-    db.ref("tasks").on("value", snap => {
+if(requireLogin()){
+  populateBays();
 
-      const div = document.getElementById("tasks");
-      div.innerHTML = "";
+  // TASKS + QUEUE + DASHBOARD STATS
+  db.ref("tasks").on("value", snap => {
 
-      let tasks = [];
-      snap.forEach(child=>{
-        let t = child.val() || {};
-        t.id = child.key;
-        tasks.push(t);
-      });
-
-      tasks.sort((a,b)=>(a.position||0)-(b.position||0));
-
-      tasks.forEach((t, idx)=>{
-        const row=document.createElement("div");
-        row.className="task";
-
-        const pri = t.priority ? "⚠ PRIORITY<br>" : "";
-        const loc = (t.type==="Move Trailer")
-          ? `${t.from || ""} → ${t.to || ""}<br>${(t.loadType || "").toUpperCase()}`
-          : `Bay ${t.bay || ""}`;
-
-        let html = `
-          <b>${idx+1}. ${t.trailer || ""}</b><br>
-          ${pri}
-          ${t.type || ""}<br>
-          ${loc}<br>
-          Status: ${t.status || ""}
-        `;
-
-        if (t.status === "accepted") {
-          html += `<br>Accepted: ${t.acceptedBy || ""} (${t.driver || ""})`;
-        }
-
-        row.innerHTML = html;
-
-        // Reorder buttons: only for waiting tasks, and only after first 4 (idx >= 4)
-        if (t.status === "waiting" && idx >= 4) {
-          const up=document.createElement("button");
-          up.innerText="▲";
-          up.onclick=()=>moveUp(t.id);
-
-          const down=document.createElement("button");
-          down.innerText="▼";
-          down.onclick=()=>moveDown(t.id);
-
-          row.appendChild(up);
-          row.appendChild(down);
-        }
-
-        // Delete: only waiting tasks
-        if (t.status === "waiting") {
-          const del=document.createElement("button");
-          del.innerText="Delete";
-          del.onclick=()=>deleteTask(t.id);
-          row.appendChild(del);
-        }
-
-        div.appendChild(row);
-      });
-
+    let tasks=[];
+    snap.forEach(child=>{
+      let t=child.val() || {};
+      t.id=child.key;
+      tasks.push(t);
     });
-  }
 
-  function renderPower(){
-    db.ref("powerConnections").on("value", snap => {
-      const div=document.getElementById("powerConnections");
-      div.innerHTML="";
+    tasks.sort((a,b)=>(a.position||0)-(b.position||0));
 
-      snap.forEach(child=>{
-        const v=child.key;
-        const p=child.val() || {};
-        if (p.status !== "connected") return;
+    // stats
+    document.getElementById("queue").innerText = tasks.filter(t=>t.status==="waiting").length;
+    document.getElementById("priority").innerText = tasks.filter(t=>t.status==="waiting" && t.priority).length;
+    document.getElementById("active").innerText = tasks.filter(t=>t.status==="accepted").length;
 
-        const row=document.createElement("div");
-        row.className="task";
+    // render queue
+    const div=document.getElementById("tasks");
+    div.innerHTML="";
 
-        const btn=document.createElement("button");
-        btn.innerText="Finish Power";
-        btn.onclick=()=>finishPower(v, btn);
+    tasks.forEach((t, idx)=>{
 
-        row.innerHTML = `<b>${v}</b> ⚡ Bay ${p.bay || ""} — ${p.trailer || ""}<br>`;
-        row.appendChild(btn);
-        div.appendChild(row);
-      });
+      const row=document.createElement("div");
+      row.className="task";
+
+      const pri = t.priority ? "⚠ PRIORITY<br>" : "";
+      const requester = t.requestedBy ? ("Requested by: " + t.requestedBy + " (" + (t.requestedRole||"") + ")") : "Requested by: Unknown";
+      const loc = (t.type==="Move Trailer")
+        ? `${t.from||""} → ${t.to||""}<br>${(t.loadType||"").toUpperCase()}`
+        : `Bay ${t.bay||""}`;
+
+      let html = `
+        <b>${idx+1}. ${t.trailer||""}</b><br>
+        ${pri}
+        ${t.type||""}<br>
+        ${loc}<br>
+        ${requester}<br>
+        Status: ${t.status||""}
+      `;
+
+      if(t.status==="accepted"){
+        html += `<br>Accepted: ${t.acceptedBy||""} (${t.driver||""})`;
+      }
+
+      row.innerHTML = html;
+
+      // reorder buttons: waiting only, idx >= 4
+      if(t.status==="waiting" && idx>=4){
+        const up=document.createElement("button");
+        up.innerText="▲";
+        up.onclick=()=>moveUp(t.id);
+
+        const down=document.createElement("button");
+        down.innerText="▼";
+        down.onclick=()=>moveDown(t.id);
+
+        row.appendChild(up);
+        row.appendChild(down);
+      }
+
+      // delete: waiting only
+      if(t.status==="waiting"){
+        const del=document.createElement("button");
+        del.innerText="Delete";
+        del.onclick=()=>deleteTask(t.id);
+        row.appendChild(del);
+      }
+
+      div.appendChild(row);
     });
-  }
 
-  function renderShunters(){
-    db.ref("shunters").on("value", snap => {
-      const div=document.getElementById("shunterStatus");
-      div.innerHTML="";
+  });
 
-      snap.forEach(child=>{
-        const v=child.key;
-        const s=child.val() || {};
-        const row=document.createElement("div");
-        row.className="task";
-        row.innerHTML = `<b>${v}</b> — ${s.driver || ""} — ${s.status || ""}`;
-        div.appendChild(row);
-      });
+  // SHUNTERS
+  db.ref("shunters").on("value", snap => {
+
+    let available=0;
+    let br=0;
+
+    const div=document.getElementById("shunters");
+    div.innerHTML="";
+
+    snap.forEach(child=>{
+      const s=child.val() || {};
+      const row=document.createElement("div");
+      row.className="task";
+      row.innerHTML = `<b>${child.key}</b><br>Driver: ${s.driver||""}<br>Status: ${s.status||""}`;
+      div.appendChild(row);
+
+      if(s.status==="available") available++;
+      if(s.status==="break") br++;
     });
-  }
 
-  renderManagerQueue();
-  renderPower();
-  renderShunters();
+    document.getElementById("available").innerText = available;
+    document.getElementById("break").innerText = br;
+
+  });
+
+  // POWER
+  db.ref("powerConnections").on("value", snap => {
+
+    const div=document.getElementById("powerConnections");
+    div.innerHTML="";
+
+    let count=0;
+
+    snap.forEach(child=>{
+      count++;
+      const p=child.val() || {};
+      const row=document.createElement("div");
+      row.className="task";
+      row.innerHTML = `<b>${child.key}</b> powering Bay ${p.bay||""}<br>`;
+      const btn=document.createElement("button");
+      btn.innerText="Finish Power";
+      btn.onclick=()=>finishPower(child.key, btn);
+      row.appendChild(btn);
+      div.appendChild(row);
+    });
+
+    document.getElementById("power").innerText = count;
+
+  });
+}
 </script>
 
 </body>
