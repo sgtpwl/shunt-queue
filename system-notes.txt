@@ -1,0 +1,74 @@
+SHUNT QUEUE SYSTEM
+Developer: Lee Powell
+Year: 2026
+
+Tech Stack
+----------
+GitHub Pages
+Firebase Realtime Database
+
+Vehicles
+--------
+S1
+S2
+S3
+S4
+SPARE
+
+Pages
+-----
+index.html        Landing page
+manager.html      Managers manage queue
+supervisor.html   Supervisors create tasks
+shunter-login.html Vehicle + driver login
+shunter.html      Tablet interface for drivers
+admin.html        Reporting dashboard
+
+Database Structure
+------------------
+
+tasks/
+   trailer
+   type
+   from
+   to
+   bay
+   status
+   created
+   acceptedTime
+   completedTime
+   acceptedBy
+   driver
+
+shunters/
+   vehicle
+   driver
+   status
+   breakStart
+
+powerConnections/
+   vehicle
+   bay
+   trailer
+   status
+
+shiftEvents/
+   vehicle
+   driver
+   event
+   time
+
+Key Features
+------------
+FIFO queue
+First 4 tasks locked
+Accepted tasks locked
+Vehicle based login
+Driver recorded
+Power trailer support
+Break tracking
+Shift logs
+Task timing metrics
+Live yard dashboard
+CSV reporting
+Alert system
