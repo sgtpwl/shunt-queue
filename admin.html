@@ -10,17 +10,14 @@
 
 <h1>Admin Dashboard</h1>
 
-<h2>Alerts</h2>
-<div id="alerts"></div>
+<h2>System Tools</h2>
+
+<button onclick="resetShunters()">Reset Shunters</button>
+<button onclick="clearPower()">Clear Power</button>
+<button onclick="clearCompleted()">Delete Completed Tasks</button>
 
 <h2>Live Yard Status</h2>
 <div id="yardStatus"></div>
-
-<h2>System Stats</h2>
-<div id="systemStats"></div>
-
-<h2>Shunter Performance</h2>
-<div id="shunterStats"></div>
 
 <h2>Completed Tasks</h2>
 <div id="completedTasks"></div>
@@ -38,9 +35,7 @@ let powerData={};
 let shuntersData={};
 
 function minutes(ms){
-
 return Math.floor(ms/60000);
-
 }
 
 function loadAll(){
@@ -50,16 +45,12 @@ db.ref("tasks").on("value",snap=>{
 tasksData=[];
 
 snap.forEach(child=>{
-
 let t=child.val();
 t.id=child.key;
 tasksData.push(t);
-
 });
 
-renderStats();
 renderCompleted();
-renderYard();
 
 });
 
@@ -68,9 +59,7 @@ db.ref("powerConnections").on("value",snap=>{
 powerData={};
 
 snap.forEach(child=>{
-
 powerData[child.key]=child.val();
-
 });
 
 renderYard();
@@ -82,9 +71,7 @@ db.ref("shunters").on("value",snap=>{
 shuntersData={};
 
 snap.forEach(child=>{
-
 shuntersData[child.key]=child.val();
-
 });
 
 renderYard();
@@ -139,30 +126,16 @@ let row=document.createElement("div");
 row.className="task";
 
 row.innerHTML=`
-Trailer ${t.trailer}
-Vehicle ${t.acceptedBy}
-Driver ${t.driver}
-Delay ${delay} min
+Trailer ${t.trailer}<br>
+Vehicle ${t.acceptedBy}<br>
+Driver ${t.driver}<br>
+Delay ${delay} min<br>
 Duration ${dur} min
 `;
 
 div.appendChild(row);
 
 });
-
-}
-
-function renderStats(){
-
-let total=0;
-
-tasksData.forEach(t=>{
-
-if(t.status==="completed") total++;
-
-});
-
-document.getElementById("systemStats").innerHTML=`Tasks Completed ${total}`;
 
 }
 
@@ -183,6 +156,40 @@ let a=document.createElement("a");
 a.href=url;
 a.download="report.csv";
 a.click();
+
+}
+
+function resetShunters(){
+
+if(confirm("Reset all shunters?")){
+db.ref("shunters").remove();
+}
+
+}
+
+function clearPower(){
+
+if(confirm("Clear power connections?")){
+db.ref("powerConnections").remove();
+}
+
+}
+
+function clearCompleted(){
+
+db.ref("tasks").once("value",snap=>{
+
+snap.forEach(child=>{
+
+let t=child.val();
+
+if(t.status==="completed"){
+db.ref("tasks/"+child.key).remove();
+}
+
+});
+
+});
 
 }
 
