@@ -1,27 +1,21 @@
 <!DOCTYPE html>
 <html>
 <head>
-
 <title>Shunter Tasks</title>
-
 <link rel="stylesheet" href="style.css">
-
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 </head>
 
 <body>
 
 <div style="display:flex;justify-content:space-between;padding:10px;align-items:center;">
 
-<h2 id="vehicleName"></h2>
+<h2 id="vehicleInfo"></h2>
 
 <div>
-
 <button onclick="setBreak()">Break</button>
-<button onclick="backFromBreak()">Back To Work</button>
+<button onclick="backFromBreak()">Back</button>
 <button onclick="endShift()">End Shift</button>
-
 </div>
 
 </div>
@@ -32,7 +26,6 @@
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
 <script src="config.js"></script>
 
 <script>
@@ -41,14 +34,29 @@ function vehicle(){
 return localStorage.getItem("vehicle");
 }
 
+function driver(){
+return localStorage.getItem("driver");
+}
+
+function logEvent(event){
+
+db.ref("shiftEvents").push({
+vehicle:vehicle(),
+driver:driver(),
+event:event,
+time:Date.now()
+});
+
+}
+
 function endShift(){
 
-const v = vehicle();
+logEvent("end shift");
 
-db.ref("shunters/"+v).remove();
-db.ref("powerConnections/"+v).remove();
+db.ref("shunters/"+vehicle()).remove();
+db.ref("powerConnections/"+vehicle()).remove();
 
-localStorage.removeItem("vehicle");
+localStorage.clear();
 
 window.location.href="shunter-login.html";
 
@@ -56,12 +64,12 @@ window.location.href="shunter-login.html";
 
 function setBreak(){
 
-const v=vehicle();
-
-db.ref("shunters/"+v).update({
+db.ref("shunters/"+vehicle()).update({
 status:"break",
 breakStart:Date.now()
 });
+
+logEvent("break");
 
 document.getElementById("screen").innerHTML="<h2>ON BREAK</h2>";
 
@@ -69,26 +77,25 @@ document.getElementById("screen").innerHTML="<h2>ON BREAK</h2>";
 
 function backFromBreak(){
 
-const v=vehicle();
-
-db.ref("shunters/"+v).update({
+db.ref("shunters/"+vehicle()).update({
 status:"available",
 breakStart:null
 });
+
+logEvent("back");
 
 }
 
 function acceptTask(id){
 
-const v=vehicle();
-
 db.ref("tasks/"+id).update({
 status:"accepted",
-acceptedBy:v,
+acceptedBy:vehicle(),
+driver:driver(),
 acceptedTime:Date.now()
 });
 
-db.ref("shunters/"+v).update({
+db.ref("shunters/"+vehicle()).update({
 status:"busy"
 });
 
@@ -96,48 +103,12 @@ status:"busy"
 
 function completeTask(id){
 
-const v=vehicle();
-
 db.ref("tasks/"+id).update({
 status:"completed",
 completedTime:Date.now()
 });
 
-db.ref("shunters/"+v).update({
-status:"available"
-});
-
-}
-
-function connectPower(task){
-
-const v=vehicle();
-
-db.ref("powerConnections/"+v).set({
-trailer:task.trailer,
-bay:task.bay,
-status:"connected"
-});
-
-db.ref("tasks/"+task.id).update({
-status:"accepted",
-acceptedBy:v,
-acceptedTime:Date.now()
-});
-
-db.ref("shunters/"+v).update({
-status:"power"
-});
-
-}
-
-function acknowledgePower(){
-
-const v=vehicle();
-
-db.ref("powerConnections/"+v).remove();
-
-db.ref("shunters/"+v).update({
+db.ref("shunters/"+vehicle()).update({
 status:"available"
 });
 
@@ -148,6 +119,7 @@ function loadTasks(){
 db.ref("tasks").on("value",snapshot=>{
 
 const v=vehicle();
+
 const div=document.getElementById("screen");
 
 let tasks=[];
@@ -165,23 +137,6 @@ tasks.sort((a,b)=>a.position-b.position);
 let myTask=tasks.find(t=>t.acceptedBy===v && t.status==="accepted");
 
 if(myTask){
-
-if(myTask.type==="Provide Power (DD)"){
-
-div.innerHTML=`
-<h2>${myTask.trailer}</h2>
-<p>Provide Power</p>
-<p>Bay ${myTask.bay}</p>
-
-<button onclick='connectPower(${JSON.stringify(myTask)})'
-style="width:90%;height:80px;font-size:28px">
-CONNECTED
-</button>
-`;
-
-return;
-
-}
 
 div.innerHTML=`
 <h2>${myTask.trailer}</h2>
@@ -223,14 +178,8 @@ div.innerHTML="No tasks waiting";
 
 window.onload=function(){
 
-const v=vehicle();
-
-if(!v){
-window.location.href="shunter-login.html";
-return;
-}
-
-document.getElementById("vehicleName").innerText="Vehicle: "+v;
+document.getElementById("vehicleInfo").innerText=
+"Vehicle: "+vehicle()+" | Driver: "+driver();
 
 loadTasks();
 
