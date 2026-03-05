@@ -1,29 +1,168 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Manager Login</title>
+  <title>Supervisor - Shunt Queue</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<h1>Manager Login</h1>
+<h1>Supervisor</h1>
 
-<input id="name" placeholder="Enter your name">
+<div id="who"></div>
+<button onclick="logout()">Logout</button>
+
+<hr>
+
+<h2>Create Task</h2>
+
+<select id="taskType" onchange="toggleTaskInputs()">
+  <option value="move">Move Trailer</option>
+  <option value="power">Provide Power (DD)</option>
+</select>
+
 <br><br>
 
-<button onclick="login()">Login</button>
+<label>
+  <input type="checkbox" id="priority">
+  Gatehouse Priority
+</label>
+
+<br><br>
+
+<div id="moveFields">
+
+  <input id="trailer" placeholder="Trailer Number">
+  <input id="from" placeholder="From Location">
+  <input id="to" placeholder="To Location">
+
+  <br><br>
+
+  <select id="loadType">
+    <option value="Full Load">Full Load</option>
+    <option value="Empty Trailer">Empty Trailer</option>
+    <option value="Trunk Trailer" selected>Trunk Trailer</option>
+  </select>
+
+</div>
+
+<div id="powerFields" style="display:none">
+
+  <input id="powerTrailer" placeholder="Trailer Number">
+
+  <br><br>
+
+  <select id="bay">
+    <option value="">Select Bay</option>
+  </select>
+
+</div>
+
+<br><br>
+
+<button onclick="addTask(this)">Submit Task</button>
+<p id="msg"></p>
+
+<hr>
+
+<h2>Queue (Read Only)</h2>
+<div id="queue"></div>
 
 <script>
-function login(){
-  const name = (document.getElementById("name").value || "").trim();
-  if(!name){
-    alert("Enter your name");
-    return;
+function requireLogin(){
+  const name = localStorage.getItem("userName");
+  const role = localStorage.getItem("userRole");
+  if(!name || role !== "Supervisor"){
+    window.location.href = "supervisor-login.html";
+    return false;
   }
-  localStorage.setItem("userName", name);
-  localStorage.setItem("userRole", "Manager");
-  window.location.href = "manager.html";
+  document.getElementById("who").innerHTML = "Logged in as: <b>" + name + "</b> (Supervisor)";
+  return true;
+}
+
+function logout(){
+  localStorage.removeItem("userName");
+  localStorage.removeItem("userRole");
+  window.location.href = "index.html";
+}
+
+function toggleTaskInputs(){
+  const type = document.getElementById("taskType").value;
+  document.getElementById("moveFields").style.display = (type==="move") ? "block" : "none";
+  document.getElementById("powerFields").style.display = (type==="power") ? "block" : "none";
+}
+
+function populateBays(){
+  const baySelect = document.getElementById("bay");
+
+  for(let i=1;i<=25;i++){
+    const opt=document.createElement("option");
+    opt.value="B"+i;
+    opt.innerText="B"+i;
+    baySelect.appendChild(opt);
+  }
+
+  for(let i=1;i<=26;i++){
+    const opt=document.createElement("option");
+    opt.value="C"+i;
+    opt.innerText="C"+i;
+    baySelect.appendChild(opt);
+  }
+}
+</script>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+
+<script>
+if(requireLogin()){
+  populateBays();
+
+  db.ref("tasks").on("value", snap => {
+
+    const div=document.getElementById("queue");
+    div.innerHTML="";
+
+    let tasks=[];
+    snap.forEach(child=>{
+      let t=child.val() || {};
+      t.id=child.key;
+      tasks.push(t);
+    });
+
+    tasks.sort((a,b)=>(a.position||0)-(b.position||0));
+
+    tasks.forEach((t, idx)=>{
+
+      const row=document.createElement("div");
+      row.className="task";
+
+      const pri = t.priority ? "⚠ PRIORITY<br>" : "";
+      const requester = t.requestedBy ? ("Requested by: " + t.requestedBy + " (" + (t.requestedRole||"") + ")") : "Requested by: Unknown";
+      const loc = (t.type==="Move Trailer")
+        ? `${t.from||""} → ${t.to||""}<br>${(t.loadType||"").toUpperCase()}`
+        : `Bay ${t.bay||""}`;
+
+      const accepted = (t.status==="accepted")
+        ? `<br>Accepted: ${t.acceptedBy||""} (${t.driver||""})`
+        : "";
+
+      row.innerHTML = `
+        <b>${idx+1}. ${t.trailer||""}</b><br>
+        ${pri}
+        ${t.type||""}<br>
+        ${loc}<br>
+        ${requester}<br>
+        Status: ${t.status||""}
+        ${accepted}
+      `;
+
+      div.appendChild(row);
+    });
+
+  });
 }
 </script>
 
