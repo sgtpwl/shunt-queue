@@ -125,14 +125,17 @@ if(requireLogin()){
     const div=document.getElementById("queue");
     div.innerHTML="";
 
-    let tasks=[];
+    let all=[];
     snap.forEach(child=>{
       let t=child.val() || {};
       t.id=child.key;
-      tasks.push(t);
+      all.push(t);
     });
 
-    tasks.sort((a,b)=>(a.position||0)-(b.position||0));
+    all.sort((a,b)=>(a.position||0)-(b.position||0));
+
+    // Hide completed
+    const tasks = all.filter(t => t.status !== "completed");
 
     tasks.forEach((t, idx)=>{
 
@@ -140,7 +143,10 @@ if(requireLogin()){
       row.className="task";
 
       const pri = t.priority ? "⚠ PRIORITY<br>" : "";
-      const requester = t.requestedBy ? ("Requested by: " + t.requestedBy + " (" + (t.requestedRole||"") + ")") : "Requested by: Unknown";
+      const requester = t.requestedBy
+        ? ("Requested by: " + t.requestedBy + " (" + (t.requestedRole||"") + ")")
+        : "Requested by: Unknown";
+
       const loc = (t.type==="Move Trailer")
         ? `${t.from||""} → ${t.to||""}<br>${(t.loadType||"").toUpperCase()}`
         : `Bay ${t.bay||""}`;
