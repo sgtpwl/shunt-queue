@@ -5,50 +5,52 @@
 <title>Admin Dashboard</title>
 
 <style>
+
 body{
-    font-family: Arial, sans-serif;
-    margin:40px;
-    background:#f5f5f5;
+font-family: Arial, sans-serif;
+margin:40px;
+background:#f4f6f8;
 }
 
 h1{
-    margin-bottom:30px;
+margin-bottom:20px;
 }
 
 button{
-    background:#2d6cdf;
-    color:white;
-    border:none;
-    padding:10px 18px;
-    font-size:16px;
-    border-radius:4px;
-    cursor:pointer;
+background:#2d6cdf;
+color:white;
+border:none;
+padding:10px 18px;
+font-size:16px;
+border-radius:4px;
+cursor:pointer;
 }
 
 button:hover{
-    background:#1f4fb3;
+background:#1f4fb3;
 }
 
 .section{
-    margin-top:30px;
+margin-top:30px;
 }
 
 .vehicle{
-    background:white;
-    padding:14px;
-    margin-bottom:10px;
-    border-radius:6px;
-    box-shadow:0 1px 3px rgba(0,0,0,0.1);
-    font-size:16px;
+background:white;
+padding:14px;
+margin-bottom:10px;
+border-radius:6px;
+box-shadow:0 1px 3px rgba(0,0,0,0.1);
+font-size:16px;
 }
 
 .alert{
-    background:#ffefef;
-    border-left:6px solid red;
-    padding:12px;
-    margin-bottom:10px;
-    border-radius:4px;
+background:#ffe6e6;
+border-left:6px solid red;
+padding:12px;
+margin-bottom:10px;
+border-radius:4px;
 }
+
 </style>
 </head>
 
@@ -68,29 +70,24 @@ button:hover{
 <div id="alerts"></div>
 </div>
 
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <script>
 
-/* FIREBASE CONFIG */
-
 const firebaseConfig = {
-apiKey: "YOURKEY",
-authDomain: "YOURPROJECT.firebaseapp.com",
-databaseURL: "https://YOURPROJECT-default-rtdb.firebaseio.com",
-projectId: "YOURPROJECT",
-storageBucket: "YOURPROJECT.appspot.com",
-messagingSenderId: "XXXX",
-appId: "XXXX"
+apiKey: "AIzaSyACwPAzBK_TFOyIuuI0iNzy_9zW-CKA7m4",
+authDomain: "shunt-queue.firebaseapp.com",
+databaseURL: "https://shunt-queue-default-rtdb.europe-west1.firebasedatabase.app",
+projectId: "shunt-queue",
+storageBucket: "shunt-queue.appspot.com",
+messagingSenderId: "773776993625",
+appId: "1:773776993625:web:2082ee7a38be041bee7048"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-
-/* LIVE YARD STATUS */
 
 function loadYardStatus(){
 
@@ -122,8 +119,6 @@ container.appendChild(div);
 
 }
 
-
-/* ALERT SYSTEM */
 
 function checkAlerts(){
 
@@ -164,8 +159,6 @@ alertBox.appendChild(div);
 }
 
 
-/* CSV EXPORT */
-
 function downloadCSV(){
 
 db.ref("shiftEvents").once("value", snapshot => {
@@ -177,10 +170,10 @@ snapshot.forEach(child => {
 const e = child.val();
 
 csv +=
-e.time + "," +
-e.vehicle + "," +
-e.driver + "," +
-e.event + "," +
+(e.time || "") + "," +
+(e.vehicle || "") + "," +
+(e.driver || "") + "," +
+(e.event || "") + "," +
 (e.details || "") +
 "\n";
 
@@ -199,12 +192,8 @@ a.click();
 }
 
 
-/* INITIAL LOAD */
-
 loadYardStatus();
 checkAlerts();
-
-/* RUN ALERT CHECK EVERY MINUTE */
 
 setInterval(checkAlerts,60000);
 
