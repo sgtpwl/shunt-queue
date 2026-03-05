@@ -1,111 +1,147 @@
 <!DOCTYPE html>
 <html>
 <head>
-
-<title>Shunter</title>
-
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="style.css">
-
+  <title>Shunter</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
-<h1>Shunter Screen</h1>
+<h1>Shunter</h1>
 
-<div id="task"></div>
+<div id="who"></div>
+
+<button onclick="endShift()">End Shift</button>
+
+<hr>
+
+<div id="screen">Loading…</div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
 <script src="config.js"></script>
 <script src="app.js"></script>
 
 <script>
+function vehicle(){ return localStorage.getItem("vehicle"); }
+function driver(){ return localStorage.getItem("driver"); }
 
-function loadTask(){
+function requireLogin(){
+  if(!vehicle() || !driver()){
+    window.location.href = "shunter-login.html";
+    return false;
+  }
+  document.getElementById("who").innerHTML =
+    "Vehicle: <b>" + vehicle() + "</b> | Driver: <b>" + driver() + "</b>";
+  return true;
+}
 
-let vehicle=localStorage.getItem("vehicle")
+function endShift(){
+  const v = vehicle();
+  if(!v) return;
 
-db.ref("tasks").on("value",snap=>{
+  // clear shunter + power state only (tasks remain for records)
+  db.ref("shunters/" + v).remove();
+  db.ref("powerConnections/" + v).remove();
 
-let tasks=[]
+  localStorage.removeItem("vehicle");
+  localStorage.removeItem("driver");
 
-snap.forEach(child=>{
-let t=child.val()
-t.id=child.key
-tasks.push(t)
-})
+  window.location.href = "index.html";
+}
 
-tasks=tasks.filter(t=>t.status!=="completed")
+function renderTask(t, mode){
 
-tasks.sort((a,b)=>a.position-b.position)
+  const div = document.getElementById("screen");
 
-let myTask=tasks.find(t=>t.status==="accepted" && t.acceptedBy===vehicle)
+  const pri = t.priority ? "⚠ PRIORITY<br>" : "";
+  const requester = t.requestedBy
+    ? ("Requested by: " + t.requestedBy + " (" + (t.requestedRole||"") + ")")
+    : "Requested by: Unknown";
 
-let nextTask=tasks.find(t=>t.status==="waiting")
+  let loc = "";
+  let extra = "";
 
-let task=myTask || nextTask
+  if(t.type === "Move Trailer"){
+    loc = (t.from||"") + " → " + (t.to||"");
+    extra = (t.loadType||"").toUpperCase();
+  }else{
+    loc = "Bay " + (t.bay||"");
+    extra = "";
+  }
 
-let div=document.getElementById("task")
+  let html = `
+    <h2>${t.trailer || ""}</h2>
+    ${pri}
+    ${t.type || ""}<br>
+    ${loc}<br>
+    ${extra ? (extra + "<br>") : ""}
+    ${requester}<br>
+    <br>
+  `;
 
-if(!task){
+  if(mode === "accept"){
+    html += `<button style="width:90%;height:80px;font-size:28px" onclick="acceptTask('${t.id}')">ACCEPT</button>`;
+  }
 
-div.innerHTML="No tasks waiting"
-return
+  if(mode === "complete"){
+    html += `<button style="width:90%;height:80px;font-size:28px" onclick="completeAndPrompt('${t.id}')">COMPLETE</button>`;
+
+    // Gatehouse notify only for PRIORITY Move Trailer
+    if(t.priority && t.type === "Move Trailer"){
+      html += `<br><br><button style="width:90%;height:70px;font-size:22px" onclick="notifyGatehouse('${t.id}')">Notify Gatehouse Bay Cleared</button>`;
+    }
+  }
+
+  div.innerHTML = html;
+}
+
+function completeAndPrompt(taskId){
+  completeTask(taskId);
+  // UI will refresh automatically via listener and show next task
+}
+
+function loadNext(){
+
+  const v = vehicle();
+
+  db.ref("tasks").on("value", snap => {
+
+    let tasks = [];
+    snap.forEach(child=>{
+      let t = child.val() || {};
+      t.id = child.key;
+      tasks.push(t);
+    });
+
+    // Only not-completed tasks matter to shunters
+    tasks = tasks.filter(t => t.status !== "completed");
+
+    // Robust sort even if position missing
+    tasks.sort((a,b)=>((a.position||999999) - (b.position||999999)));
+
+    // If I already accepted a task, I must finish it first
+    const mine = tasks.find(t => t.status === "accepted" && t.acceptedBy === v);
+    if(mine){
+      renderTask(mine, "complete");
+      return;
+    }
+
+    // Otherwise show next waiting task
+    const next = tasks.find(t => t.status === "waiting");
+    if(next){
+      renderTask(next, "accept");
+      return;
+    }
+
+    document.getElementById("screen").innerHTML = "No tasks waiting";
+  });
 
 }
 
-let priority=task.priority ? "⚠ PRIORITY<br>" : ""
-
-let load=task.loadType ? task.loadType.toUpperCase()+"<br>" : ""
-
-let requester=`Requested by: ${task.requestedBy}`
-
-let html=`
-
-<h2>${task.trailer}</h2>
-
-${priority}
-
-${task.type}<br>
-
-${task.from ? task.from+" → "+task.to : "Bay "+task.bay}<br>
-
-${load}
-
-${requester}
-
-<br><br>
-
-`
-
-if(task.status==="waiting"){
-
-html+=`<button onclick="acceptTask('${task.id}')">Accept</button>`
-
+if(requireLogin()){
+  loadNext();
 }
-
-if(task.status==="accepted" && task.acceptedBy===vehicle){
-
-html+=`<button onclick="completeTask('${task.id}')">Complete</button>`
-
-if(task.priority){
-
-html+=`<br><br><button onclick="notifyGatehouse('${task.id}')">Notify Gatehouse Bay Cleared</button>`
-
-}
-
-}
-
-div.innerHTML=html
-
-})
-
-}
-
-loadTask()
-
 </script>
 
 </body>
