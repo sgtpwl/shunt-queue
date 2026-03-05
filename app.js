@@ -1,134 +1,174 @@
-/* ADD TASK */
+<!DOCTYPE html>
+<html>
+<head>
 
-function addTask(){
+<title>Manager Dashboard</title>
 
-let type=document.getElementById("taskType").value;
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="style.css">
 
-let trailer="";
-let from="";
-let to="";
-let bay="";
+</head>
 
-if(type==="move"){
+<body>
 
-trailer=document.getElementById("trailer").value;
-from=document.getElementById("from").value;
-to=document.getElementById("to").value;
+<h1>Manager Dashboard</h1>
 
-}else{
+<h2>Create Task</h2>
 
-trailer=document.getElementById("powerTrailer").value;
-bay=document.getElementById("bay").value;
+<select id="taskType" onchange="toggleTaskInputs()">
+<option value="move">Move Trailer</option>
+<option value="power">Provide Power (DD)</option>
+</select>
+
+<div id="moveFields">
+
+<input id="trailer" placeholder="Trailer Number">
+<input id="from" placeholder="From Location">
+<input id="to" placeholder="To Location">
+
+</div>
+
+<div id="powerFields" style="display:none">
+
+<input id="powerTrailer" placeholder="Trailer Number">
+
+<select id="bay">
+<option value="">Select Bay</option>
+
+<script>
+
+for(let i=1;i<=25;i++){
+document.write(`<option value="B${i}">B${i}</option>`)
+}
+
+for(let i=1;i<=26;i++){
+document.write(`<option value="C${i}">C${i}</option>`)
+}
+
+</script>
+
+</select>
+
+</div>
+
+<br>
+
+<button onclick="addTask()">Submit Task</button>
+
+<p id="msg"></p>
+
+<hr>
+
+<h2>Queue</h2>
+
+<div id="tasks"></div>
+
+<hr>
+
+<h2>Active Power</h2>
+
+<div id="powerConnections"></div>
+
+<hr>
+
+<h2>Shunters</h2>
+
+<div id="shunterStatus"></div>
+
+<script>
+
+function toggleTaskInputs(){
+
+let type=document.getElementById("taskType").value
+
+document.getElementById("moveFields").style.display=(type==="move")?"block":"none"
+document.getElementById("powerFields").style.display=(type==="power")?"block":"none"
 
 }
 
-if(!trailer){
-alert("Enter trailer number");
-return;
-}
+</script>
 
-db.ref("tasks").once("value",snap=>{
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-let position=snap.numChildren()+1;
+<script src="config.js"></script>
+<script src="app.js"></script>
 
-db.ref("tasks").push({
+<script>
 
-type:type==="move"?"Move Trailer":"Provide Power (DD)",
-trailer:trailer,
-from:from,
-to:to,
-bay:bay,
-status:"waiting",
-created:Date.now(),
-position:position
+function loadTasks(){
 
-});
+db.ref("tasks").on("value",snapshot=>{
 
-document.getElementById("msg").innerText="Task Added";
+const tasksDiv=document.getElementById("tasks")
 
-});
+tasksDiv.innerHTML=""
 
-}
+let tasks=[]
 
-/* MOVE QUEUE */
+snapshot.forEach(child=>{
 
-function moveUp(id){
+let t=child.val()
+t.id=child.key
+tasks.push(t)
 
-db.ref("tasks").once("value",snap=>{
+})
 
-let tasks=[];
+tasks.sort((a,b)=>a.position-b.position)
 
-snap.forEach(child=>{
-let t=child.val();
-t.id=child.key;
-tasks.push(t);
-});
+tasks.forEach((task,index)=>{
 
-tasks.sort((a,b)=>a.position-b.position);
+const div=document.createElement("div")
+div.className="task"
 
-let index=tasks.findIndex(t=>t.id===id);
+div.innerHTML=`
 
-if(index<=0) return;
+${task.trailer} — ${task.type}<br>
 
-let above=tasks[index-1];
+${task.from?task.from+" → "+task.to:"Bay "+task.bay}<br>
 
-db.ref("tasks/"+id+"/position").set(above.position);
-db.ref("tasks/"+above.id+"/position").set(tasks[index].position);
+${task.status}
 
-});
+${task.acceptedBy?`<br>Accepted by: ${task.acceptedBy}`:""}
 
-}
+`
 
-function moveDown(id){
+/* lock first 4 tasks */
 
-db.ref("tasks").once("value",snap=>{
+if(index>=4){
 
-let tasks=[];
+const up=document.createElement("button")
+up.innerText="▲"
+up.onclick=()=>moveUp(task.id)
 
-snap.forEach(child=>{
-let t=child.val();
-t.id=child.key;
-tasks.push(t);
-});
+const down=document.createElement("button")
+down.innerText="▼"
+down.onclick=()=>moveDown(task.id)
 
-tasks.sort((a,b)=>a.position-b.position);
-
-let index=tasks.findIndex(t=>t.id===id);
-
-if(index>=tasks.length-1) return;
-
-let below=tasks[index+1];
-
-db.ref("tasks/"+id+"/position").set(below.position);
-db.ref("tasks/"+below.id+"/position").set(tasks[index].position);
-
-});
+div.appendChild(up)
+div.appendChild(down)
 
 }
 
-/* DELETE TASK */
+/* delete button */
 
-function deleteTask(id){
+const del=document.createElement("button")
+del.innerText="Delete"
+del.onclick=()=>deleteTask(task.id)
 
-if(!confirm("Delete task?")) return;
+div.appendChild(del)
 
-db.ref("tasks/"+id).remove();
+tasksDiv.appendChild(div)
 
-}
+})
 
-/* FINISH POWER */
-
-function finishPower(vehicle,button){
-
-button.disabled=true;
-button.innerText="Finishing...";
-
-db.ref("powerConnections/"+vehicle).update({
-status:"readyToDisconnect"
-}).then(()=>{
-
-button.innerText="Finished";
-
-});
+})
 
 }
+
+loadTasks()
+
+</script>
+
+</body>
+</html>
