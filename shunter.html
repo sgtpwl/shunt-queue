@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Supervisor - Shunt Queue</title>
+  <title>Manager - Shunt Queue</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-<h1>Supervisor</h1>
+<h1>Manager</h1>
 
 <h2>Create Task</h2>
 
@@ -25,7 +25,6 @@
 </div>
 
 <div id="moveFields" style="margin-top:10px;">
-
   <input id="trailer" placeholder="Trailer Number">
   <input id="from" placeholder="From Location">
   <input id="to" placeholder="To Location">
@@ -35,29 +34,33 @@
     <option>Empty Trailer</option>
     <option selected>Trunk Trailer</option>
   </select>
-
 </div>
 
 <div id="powerFields" style="display:none; margin-top:10px;">
-
   <input id="powerTrailer" placeholder="Trailer Number">
-
   <select id="bay">
     <option value="">Select Bay</option>
   </select>
-
 </div>
 
 <br>
-
 <button onclick="addTask(this)">Submit Task</button>
-
 <p id="msg"></p>
 
 <hr>
 
-<h2>Queue (Read Only)</h2>
-<div id="queue"></div>
+<h2>Queue</h2>
+<div id="tasks"></div>
+
+<hr>
+
+<h2>Active Power</h2>
+<div id="powerConnections"></div>
+
+<hr>
+
+<h2>Shunters</h2>
+<div id="shunterStatus"></div>
 
 <script>
   function toggleTaskInputs(){
@@ -88,9 +91,10 @@
 <script src="app.js"></script>
 
 <script>
-  function renderQueue(){
+  function renderManagerQueue(){
     db.ref("tasks").on("value", snap => {
-      const div = document.getElementById("queue");
+
+      const div = document.getElementById("tasks");
       div.innerHTML = "";
 
       let tasks = [];
@@ -107,26 +111,95 @@
         row.className="task";
 
         const pri = t.priority ? "⚠ PRIORITY<br>" : "";
-        const who = (t.status==="accepted") ? `<br>Accepted: ${t.acceptedBy || ""} (${t.driver || ""})` : "";
         const loc = (t.type==="Move Trailer")
           ? `${t.from || ""} → ${t.to || ""}<br>${(t.loadType || "").toUpperCase()}`
           : `Bay ${t.bay || ""}`;
 
-        row.innerHTML = `
+        let html = `
           <b>${idx+1}. ${t.trailer || ""}</b><br>
           ${pri}
           ${t.type || ""}<br>
           ${loc}<br>
           Status: ${t.status || ""}
-          ${who}
         `;
 
+        if (t.status === "accepted") {
+          html += `<br>Accepted: ${t.acceptedBy || ""} (${t.driver || ""})`;
+        }
+
+        row.innerHTML = html;
+
+        // Reorder buttons: only for waiting tasks, and only after first 4 (idx >= 4)
+        if (t.status === "waiting" && idx >= 4) {
+          const up=document.createElement("button");
+          up.innerText="▲";
+          up.onclick=()=>moveUp(t.id);
+
+          const down=document.createElement("button");
+          down.innerText="▼";
+          down.onclick=()=>moveDown(t.id);
+
+          row.appendChild(up);
+          row.appendChild(down);
+        }
+
+        // Delete: only waiting tasks
+        if (t.status === "waiting") {
+          const del=document.createElement("button");
+          del.innerText="Delete";
+          del.onclick=()=>deleteTask(t.id);
+          row.appendChild(del);
+        }
+
+        div.appendChild(row);
+      });
+
+    });
+  }
+
+  function renderPower(){
+    db.ref("powerConnections").on("value", snap => {
+      const div=document.getElementById("powerConnections");
+      div.innerHTML="";
+
+      snap.forEach(child=>{
+        const v=child.key;
+        const p=child.val() || {};
+        if (p.status !== "connected") return;
+
+        const row=document.createElement("div");
+        row.className="task";
+
+        const btn=document.createElement("button");
+        btn.innerText="Finish Power";
+        btn.onclick=()=>finishPower(v, btn);
+
+        row.innerHTML = `<b>${v}</b> ⚡ Bay ${p.bay || ""} — ${p.trailer || ""}<br>`;
+        row.appendChild(btn);
         div.appendChild(row);
       });
     });
   }
 
-  renderQueue();
+  function renderShunters(){
+    db.ref("shunters").on("value", snap => {
+      const div=document.getElementById("shunterStatus");
+      div.innerHTML="";
+
+      snap.forEach(child=>{
+        const v=child.key;
+        const s=child.val() || {};
+        const row=document.createElement("div");
+        row.className="task";
+        row.innerHTML = `<b>${v}</b> — ${s.driver || ""} — ${s.status || ""}`;
+        div.appendChild(row);
+      });
+    });
+  }
+
+  renderManagerQueue();
+  renderPower();
+  renderShunters();
 </script>
 
 </body>
