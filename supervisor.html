@@ -1,123 +1,79 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>Supervisor</title>
-
-<style>
-body{
-font-family:Arial;
-margin:40px;
-}
-
-input,button{
-padding:10px;
-margin:5px;
-font-size:16px;
-}
-
-.task{
-background:#eee;
-padding:10px;
-margin:5px 0;
-}
-</style>
+<title>Supervisor - Shunt Tasks</title>
+<link rel="stylesheet" href="style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 
 <body>
 
 <h1>Create Task</h1>
 
-<label>Bay</label><br>
-<input id="bay"><br>
+<select id="taskType" onchange="updateInputs()">
+<option value="move">Move Trailer</option>
+<option value="power">Provide Power (DD)</option>
+</select>
 
-<label>Trailer</label><br>
-<input id="trailer"><br>
+<div id="moveInputs">
+<input id="trailer" placeholder="Trailer">
+<input id="from" placeholder="From">
+<input id="to" placeholder="To">
+</div>
+
+<div id="powerInputs" style="display:none;">
+<input id="powerTrailer" placeholder="Trailer">
+<select id="bay"></select>
+</div>
 
 <button onclick="addTask()">Add Task</button>
 
-<h2>Queue</h2>
-<div id="queue"></div>
+<div id="msg"></div>
 
+<h2>Finish Power</h2>
+<div id="powerList"></div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
 
 <script>
 
-const firebaseConfig = {
-apiKey: "AIzaSyACwPAzBK_TFOyIuuI0iNzy_9zW-CKA7m4",
-authDomain: "shunt-queue.firebaseapp.com",
-databaseURL: "https://shunt-queue-default-rtdb.europe-west1.firebasedatabase.app",
-projectId: "shunt-queue",
-storageBucket: "shunt-queue.appspot.com",
-messagingSenderId: "773776993625",
-appId: "1:773776993625:web:2082ee7a38be041bee7048"
-};
+function updateInputs(){
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+const type=document.getElementById("taskType").value;
 
-
-function addTask(){
-
-const bay=document.getElementById("bay").value;
-const trailer=document.getElementById("trailer").value;
-
-if(!bay || !trailer){
-
-alert("Enter bay and trailer");
-return;
+document.getElementById("moveInputs").style.display=type==="move"?"block":"none";
+document.getElementById("powerInputs").style.display=type==="power"?"block":"none";
 
 }
 
-const id=db.ref("tasks").push().key;
+function populateBays(){
 
-db.ref("tasks/"+id).set({
+const select=document.getElementById("bay");
 
-bay:bay,
-trailer:trailer,
-status:"pending",
-createdAt:Date.now()
+for(let i=1;i<=25;i++){
 
-});
-
-document.getElementById("bay").value="";
-document.getElementById("trailer").value="";
+let o=document.createElement("option");
+o.value="B"+i;
+o.innerText="B"+i;
+select.appendChild(o);
 
 }
 
+for(let i=1;i<=26;i++){
 
-function loadQueue(){
-
-const container=document.getElementById("queue");
-
-db.ref("tasks").on("value",snap=>{
-
-container.innerHTML="";
-
-snap.forEach(child=>{
-
-const t=child.val();
-
-if(t.status==="pending"){
-
-const div=document.createElement("div");
-div.className="task";
-
-div.innerText="Bay "+t.bay+" - "+t.trailer;
-
-container.appendChild(div);
+let o=document.createElement("option");
+o.value="C"+i;
+o.innerText="C"+i;
+select.appendChild(o);
 
 }
 
-});
-
-});
-
 }
 
-loadQueue();
+populateBays();
 
 </script>
 
