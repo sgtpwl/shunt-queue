@@ -1,194 +1,31 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Admin Dashboard</title>
+<title>Manager - Shunt Queue</title>
 <link rel="stylesheet" href="style.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 
 <body>
 
-<h1>Admin Dashboard</h1>
+<h1>Shunt Queue</h1>
 
 <h2>Alerts</h2>
 <div id="alerts"></div>
 
-<h2>Live Yard Status</h2>
-<div id="yardStatus"></div>
+<h2>Queue</h2>
+<div id="tasks"></div>
 
-<h2>System Stats</h2>
-<div id="systemStats"></div>
+<h2>Active Power</h2>
+<div id="powerList"></div>
 
-<h2>Shunter Performance</h2>
-<div id="shunterStats"></div>
-
-<h2>Completed Tasks</h2>
-<div id="completedTasks"></div>
-
-<button onclick="downloadCSV()">Download CSV</button>
+<h2>Shunter Status</h2>
+<div id="shunters"></div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script src="config.js"></script>
-
-<script>
-
-let tasksData=[];
-let powerData={};
-let shuntersData={};
-
-function minutes(ms){
-
-return Math.floor(ms/60000);
-
-}
-
-function loadAll(){
-
-db.ref("tasks").on("value",snap=>{
-
-tasksData=[];
-
-snap.forEach(child=>{
-
-let t=child.val();
-t.id=child.key;
-tasksData.push(t);
-
-});
-
-renderStats();
-renderCompleted();
-renderYard();
-
-});
-
-db.ref("powerConnections").on("value",snap=>{
-
-powerData={};
-
-snap.forEach(child=>{
-
-powerData[child.key]=child.val();
-
-});
-
-renderYard();
-
-});
-
-db.ref("shunters").on("value",snap=>{
-
-shuntersData={};
-
-snap.forEach(child=>{
-
-shuntersData[child.key]=child.val();
-
-});
-
-renderYard();
-
-});
-
-}
-
-function renderYard(){
-
-const div=document.getElementById("yardStatus");
-div.innerHTML="";
-
-Object.keys(shuntersData).forEach(v=>{
-
-let s=shuntersData[v];
-
-let row=document.createElement("div");
-row.className="task";
-
-if(powerData[v] && powerData[v].status==="connected"){
-
-row.innerHTML=`${v} ⚡ Power Bay ${powerData[v].bay}`;
-
-}else if(s.status==="break"){
-
-row.innerHTML=`${v} Break`;
-
-}else{
-
-row.innerHTML=`${v} Available`;
-
-}
-
-div.appendChild(row);
-
-});
-
-}
-
-function renderCompleted(){
-
-const div=document.getElementById("completedTasks");
-div.innerHTML="";
-
-tasksData.filter(t=>t.status==="completed").forEach(t=>{
-
-let delay=minutes(t.acceptedTime-t.created);
-let dur=minutes(t.completedTime-t.acceptedTime);
-
-let row=document.createElement("div");
-row.className="task";
-
-row.innerHTML=`
-Trailer ${t.trailer}
-Vehicle ${t.acceptedBy}
-Driver ${t.driver}
-Delay ${delay} min
-Duration ${dur} min
-`;
-
-div.appendChild(row);
-
-});
-
-}
-
-function renderStats(){
-
-let total=0;
-
-tasksData.forEach(t=>{
-
-if(t.status==="completed") total++;
-
-});
-
-document.getElementById("systemStats").innerHTML=`Tasks Completed ${total}`;
-
-}
-
-function downloadCSV(){
-
-let csv="Trailer,Vehicle,Driver\n";
-
-tasksData.filter(t=>t.status==="completed").forEach(t=>{
-
-csv+=`${t.trailer},${t.acceptedBy},${t.driver}\n`;
-
-});
-
-let blob=new Blob([csv]);
-let url=URL.createObjectURL(blob);
-
-let a=document.createElement("a");
-a.href=url;
-a.download="report.csv";
-a.click();
-
-}
-
-loadAll();
-
-</script>
+<script src="app.js"></script>
 
 </body>
 </html>
