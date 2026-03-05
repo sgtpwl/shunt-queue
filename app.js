@@ -1,12 +1,8 @@
-const db = firebase.database();
-
-/* ---------------------------
-ADD TASK (Supervisor)
---------------------------- */
+/* ADD TASK */
 
 function addTask(){
 
-const type=document.getElementById("taskType").value;
+let type=document.getElementById("taskType").value;
 
 let trailer="";
 let from="";
@@ -24,6 +20,11 @@ to=document.getElementById("to").value;
 trailer=document.getElementById("powerTrailer").value;
 bay=document.getElementById("bay").value;
 
+}
+
+if(!trailer){
+alert("Enter trailer number");
+return;
 }
 
 db.ref("tasks").once("value",snap=>{
@@ -49,180 +50,84 @@ document.getElementById("msg").innerText="Task Added";
 
 }
 
-/* ---------------------------
-SAFE ACCEPT TASK
---------------------------- */
+/* MOVE QUEUE */
 
-function acceptTask(taskId){
+function moveUp(id){
 
-const vehicle=localStorage.getItem("vehicle");
-const driver=localStorage.getItem("driver");
+db.ref("tasks").once("value",snap=>{
 
-const taskRef=db.ref("tasks/"+taskId);
+let tasks=[];
 
-taskRef.transaction(task=>{
+snap.forEach(child=>{
+let t=child.val();
+t.id=child.key;
+tasks.push(t);
+});
 
-if(task===null) return task;
+tasks.sort((a,b)=>a.position-b.position);
 
-/* if already accepted block it */
+let index=tasks.findIndex(t=>t.id===id);
 
-if(task.status!=="waiting"){
-return;
-}
+if(index<=0) return;
 
-task.status="accepted";
-task.acceptedBy=vehicle;
-task.driver=driver;
-task.acceptedTime=Date.now();
+let above=tasks[index-1];
 
-return task;
-
-},function(error,committed){
-
-if(!committed){
-alert("Task already taken");
-}
+db.ref("tasks/"+id+"/position").set(above.position);
+db.ref("tasks/"+above.id+"/position").set(tasks[index].position);
 
 });
 
 }
 
-/* ---------------------------
-COMPLETE TASK
---------------------------- */
+function moveDown(id){
 
-function completeTask(taskId){
+db.ref("tasks").once("value",snap=>{
 
-db.ref("tasks/"+taskId).update({
+let tasks=[];
 
-status:"completed",
-completedTime:Date.now()
+snap.forEach(child=>{
+let t=child.val();
+t.id=child.key;
+tasks.push(t);
+});
+
+tasks.sort((a,b)=>a.position-b.position);
+
+let index=tasks.findIndex(t=>t.id===id);
+
+if(index>=tasks.length-1) return;
+
+let below=tasks[index+1];
+
+db.ref("tasks/"+id+"/position").set(below.position);
+db.ref("tasks/"+below.id+"/position").set(tasks[index].position);
 
 });
 
 }
 
-/* ---------------------------
-DELETE TASK (Manager)
---------------------------- */
+/* DELETE TASK */
 
-function deleteTask(taskId){
+function deleteTask(id){
 
 if(!confirm("Delete task?")) return;
 
-db.ref("tasks/"+taskId).remove();
+db.ref("tasks/"+id).remove();
 
 }
 
-/* ---------------------------
-QUEUE MOVEMENT
---------------------------- */
+/* FINISH POWER */
 
-function moveUp(taskId){
+function finishPower(vehicle,button){
 
-db.ref("tasks").once("value",snap=>{
-
-let tasks=[];
-
-snap.forEach(child=>{
-let t=child.val();
-t.id=child.key;
-tasks.push(t);
-});
-
-tasks.sort((a,b)=>a.position-b.position);
-
-for(let i=1;i<tasks.length;i++){
-
-if(tasks[i].id===taskId){
-
-let prev=tasks[i-1];
-
-db.ref("tasks/"+tasks[i].id+"/position").set(prev.position);
-db.ref("tasks/"+prev.id+"/position").set(tasks[i].position);
-
-break;
-
-}
-
-}
-
-});
-
-}
-
-function moveDown(taskId){
-
-db.ref("tasks").once("value",snap=>{
-
-let tasks=[];
-
-snap.forEach(child=>{
-let t=child.val();
-t.id=child.key;
-tasks.push(t);
-});
-
-tasks.sort((a,b)=>a.position-b.position);
-
-for(let i=0;i<tasks.length-1;i++){
-
-if(tasks[i].id===taskId){
-
-let next=tasks[i+1];
-
-db.ref("tasks/"+tasks[i].id+"/position").set(next.position);
-db.ref("tasks/"+next.id+"/position").set(tasks[i].position);
-
-break;
-
-}
-
-}
-
-});
-
-}
-
-/* ---------------------------
-POWER MANAGEMENT
---------------------------- */
-
-function finishPower(vehicle){
+button.disabled=true;
+button.innerText="Finishing...";
 
 db.ref("powerConnections/"+vehicle).update({
-
 status:"readyToDisconnect"
+}).then(()=>{
 
-});
-
-}
-
-/* ---------------------------
-SHUNTER STATUS
---------------------------- */
-
-function setBreak(){
-
-const vehicle=localStorage.getItem("vehicle");
-
-db.ref("shunters/"+vehicle).update({
-
-status:"break",
-breakStart:Date.now()
-
-});
-
-}
-
-function backFromBreak(){
-
-const vehicle=localStorage.getItem("vehicle");
-
-db.ref("shunters/"+vehicle).update({
-
-status:"available",
-breakStart:null
+button.innerText="Finished";
 
 });
 
