@@ -1,40 +1,73 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Shunter Login</title>
+
+<title>Select Shunter</title>
+
 <link rel="stylesheet" href="style.css">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 </head>
 
-<body style="text-align:center; padding-top:60px;">
+<body>
 
-<h1>Start Shift</h1>
+<h1>Select Vehicle</h1>
 
-<br>
+<div id="vehicles"></div>
 
-<input id="name" placeholder="Enter your name"
-style="font-size:20px;padding:10px;width:250px;text-align:center;">
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-<br><br>
-
-<button onclick="startShift()" style="width:250px;height:60px;font-size:22px;">
-Start Shift
-</button>
+<script src="config.js"></script>
 
 <script>
 
-function startShift() {
+const vehicles = ["S1","S2","S3","S4","SPARE"];
 
-const name = document.getElementById("name").value.trim();
+const container = document.getElementById("vehicles");
 
-if(!name){
-alert("Enter your name");
+vehicles.forEach(v => {
+
+const btn = document.createElement("button");
+
+btn.innerText = v;
+
+btn.style.width="90%";
+btn.style.height="80px";
+btn.style.fontSize="28px";
+btn.style.margin="10px";
+
+btn.onclick = () => loginVehicle(v);
+
+container.appendChild(btn);
+
+});
+
+function loginVehicle(vehicle){
+
+db.ref("shunters/"+vehicle).once("value", snap => {
+
+if(snap.exists()){
+
+alert(vehicle+" already logged in");
+
 return;
+
 }
 
-localStorage.setItem("shunterName", name);
+db.ref("shunters/"+vehicle).set({
 
-window.location.href = "shunter.html";
+status:"available",
+loginTime:Date.now()
+
+});
+
+localStorage.setItem("vehicle",vehicle);
+
+window.location.href="shunter.html";
+
+});
 
 }
 
