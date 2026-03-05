@@ -1,10 +1,130 @@
-function moveUp(id){
+const db = firebase.database();
 
-db.ref("tasks").once("value",snapshot=>{
+/* ---------------------------
+ADD TASK (Supervisor)
+--------------------------- */
+
+function addTask(){
+
+const type=document.getElementById("taskType").value;
+
+let trailer="";
+let from="";
+let to="";
+let bay="";
+
+if(type==="move"){
+
+trailer=document.getElementById("trailer").value;
+from=document.getElementById("from").value;
+to=document.getElementById("to").value;
+
+}else{
+
+trailer=document.getElementById("powerTrailer").value;
+bay=document.getElementById("bay").value;
+
+}
+
+db.ref("tasks").once("value",snap=>{
+
+let position=snap.numChildren()+1;
+
+db.ref("tasks").push({
+
+type:type==="move"?"Move Trailer":"Provide Power (DD)",
+trailer:trailer,
+from:from,
+to:to,
+bay:bay,
+status:"waiting",
+created:Date.now(),
+position:position
+
+});
+
+document.getElementById("msg").innerText="Task Added";
+
+});
+
+}
+
+/* ---------------------------
+SAFE ACCEPT TASK
+--------------------------- */
+
+function acceptTask(taskId){
+
+const vehicle=localStorage.getItem("vehicle");
+const driver=localStorage.getItem("driver");
+
+const taskRef=db.ref("tasks/"+taskId);
+
+taskRef.transaction(task=>{
+
+if(task===null) return task;
+
+/* if already accepted block it */
+
+if(task.status!=="waiting"){
+return;
+}
+
+task.status="accepted";
+task.acceptedBy=vehicle;
+task.driver=driver;
+task.acceptedTime=Date.now();
+
+return task;
+
+},function(error,committed){
+
+if(!committed){
+alert("Task already taken");
+}
+
+});
+
+}
+
+/* ---------------------------
+COMPLETE TASK
+--------------------------- */
+
+function completeTask(taskId){
+
+db.ref("tasks/"+taskId).update({
+
+status:"completed",
+completedTime:Date.now()
+
+});
+
+}
+
+/* ---------------------------
+DELETE TASK (Manager)
+--------------------------- */
+
+function deleteTask(taskId){
+
+if(!confirm("Delete task?")) return;
+
+db.ref("tasks/"+taskId).remove();
+
+}
+
+/* ---------------------------
+QUEUE MOVEMENT
+--------------------------- */
+
+function moveUp(taskId){
+
+db.ref("tasks").once("value",snap=>{
 
 let tasks=[];
 
-snapshot.forEach(child=>{
+snap.forEach(child=>{
 let t=child.val();
 t.id=child.key;
 tasks.push(t);
@@ -12,33 +132,32 @@ tasks.push(t);
 
 tasks.sort((a,b)=>a.position-b.position);
 
-let index=tasks.findIndex(t=>t.id===id);
+for(let i=1;i<tasks.length;i++){
 
-if(index<=3) return;
+if(tasks[i].id===taskId){
 
-if(tasks[index].status!=="waiting") return;
+let prev=tasks[i-1];
 
-const temp=tasks[index];
-tasks[index]=tasks[index-1];
-tasks[index-1]=temp;
+db.ref("tasks/"+tasks[i].id+"/position").set(prev.position);
+db.ref("tasks/"+prev.id+"/position").set(tasks[i].position);
 
-tasks.forEach((t,i)=>{
-db.ref("tasks/"+t.id+"/position").set(i+1);
-});
+break;
+
+}
+
+}
 
 });
 
 }
 
+function moveDown(taskId){
 
-
-function moveDown(id){
-
-db.ref("tasks").once("value",snapshot=>{
+db.ref("tasks").once("value",snap=>{
 
 let tasks=[];
 
-snapshot.forEach(child=>{
+snap.forEach(child=>{
 let t=child.val();
 t.id=child.key;
 tasks.push(t);
@@ -46,86 +165,64 @@ tasks.push(t);
 
 tasks.sort((a,b)=>a.position-b.position);
 
-let index=tasks.findIndex(t=>t.id===id);
+for(let i=0;i<tasks.length-1;i++){
 
-if(index<3) return;
+if(tasks[i].id===taskId){
 
-if(tasks[index].status!=="waiting") return;
+let next=tasks[i+1];
 
-const temp=tasks[index];
-tasks[index]=tasks[index+1];
-tasks[index+1]=temp;
+db.ref("tasks/"+tasks[i].id+"/position").set(next.position);
+db.ref("tasks/"+next.id+"/position").set(tasks[i].position);
 
-tasks.forEach((t,i)=>{
-db.ref("tasks/"+t.id+"/position").set(i+1);
+break;
+
+}
+
+}
+
 });
 
-});
-
 }
 
+/* ---------------------------
+POWER MANAGEMENT
+--------------------------- */
 
-
-function deleteTask(id){
-
-if(!confirm("Delete this task?")) return;
-
-db.ref("tasks/"+id).remove();
-
-}
-
-
-
-function clearPower(vehicle){
-
-if(!confirm("Clear power connection?")) return;
-
-db.ref("powerConnections/"+vehicle).remove();
-
-}
-
-
-
-function finishPower(vehicle,button){
-
-button.disabled=true;
-button.innerText="Finishing...";
+function finishPower(vehicle){
 
 db.ref("powerConnections/"+vehicle).update({
+
 status:"readyToDisconnect"
+
 });
 
 }
 
+/* ---------------------------
+SHUNTER STATUS
+--------------------------- */
 
+function setBreak(){
 
-function loadPowerConnections(){
+const vehicle=localStorage.getItem("vehicle");
 
-const div=document.getElementById("powerConnections");
+db.ref("shunters/"+vehicle).update({
 
-if(!div) return;
-
-db.ref("powerConnections").on("value",snapshot=>{
-
-div.innerHTML="";
-
-snapshot.forEach(child=>{
-
-const p=child.val();
-const vehicle=child.key;
-
-const row=document.createElement("div");
-
-row.innerHTML=`
-⚡ ${vehicle} — Bay ${p.bay} — ${p.trailer}
-<br>
-<button onclick="finishPower('${vehicle}',this)">Finish</button>
-<button onclick="clearPower('${vehicle}')">Clear</button>
-`;
-
-div.appendChild(row);
+status:"break",
+breakStart:Date.now()
 
 });
+
+}
+
+function backFromBreak(){
+
+const vehicle=localStorage.getItem("vehicle");
+
+db.ref("shunters/"+vehicle).update({
+
+status:"available",
+breakStart:null
 
 });
 
