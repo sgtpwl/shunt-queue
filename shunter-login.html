@@ -1,44 +1,41 @@
 <!DOCTYPE html>
 <html>
 <head>
-
-<title>Select Shunter</title>
-
+<title>Select Vehicle</title>
 <link rel="stylesheet" href="style.css">
-
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 </head>
 
 <body>
 
 <h1>Select Vehicle</h1>
 
+<input id="driverName" placeholder="Driver Name">
+
 <div id="vehicles"></div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
 <script src="config.js"></script>
 
 <script>
 
-const vehicles = ["S1","S2","S3","S4","SPARE"];
+const vehicles=["S1","S2","S3","S4","SPARE"];
 
-const container = document.getElementById("vehicles");
+const container=document.getElementById("vehicles");
 
-vehicles.forEach(v => {
+vehicles.forEach(v=>{
 
-const btn = document.createElement("button");
+const btn=document.createElement("button");
 
-btn.innerText = v;
+btn.innerText=v;
 
 btn.style.width="90%";
 btn.style.height="80px";
 btn.style.fontSize="28px";
 btn.style.margin="10px";
 
-btn.onclick = () => loginVehicle(v);
+btn.onclick=()=>loginVehicle(v);
 
 container.appendChild(btn);
 
@@ -46,24 +43,35 @@ container.appendChild(btn);
 
 function loginVehicle(vehicle){
 
-db.ref("shunters/"+vehicle).once("value", snap => {
+const driver=document.getElementById("driverName").value.trim();
+
+if(driver.length<2){
+alert("Enter driver name");
+return;
+}
+
+db.ref("shunters/"+vehicle).once("value",snap=>{
 
 if(snap.exists()){
-
-alert(vehicle+" already logged in");
-
+alert(vehicle+" already in use");
 return;
-
 }
 
 db.ref("shunters/"+vehicle).set({
-
 status:"available",
+driver:driver,
 loginTime:Date.now()
+});
 
+db.ref("shiftEvents").push({
+vehicle:vehicle,
+driver:driver,
+event:"login",
+time:Date.now()
 });
 
 localStorage.setItem("vehicle",vehicle);
+localStorage.setItem("driver",driver);
 
 window.location.href="shunter.html";
 
