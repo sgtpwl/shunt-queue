@@ -13,8 +13,7 @@
 <h2>System Tools</h2>
 
 <button onclick="resetShunters()">Reset Shunters</button>
-<button onclick="clearPower()">Clear Power</button>
-<button onclick="clearCompleted()">Delete Completed Tasks</button>
+<button onclick="clearPower()">Clear Power Connections</button>
 
 <h2>Live Yard Status</h2>
 <div id="yardStatus"></div>
@@ -22,7 +21,7 @@
 <h2>Completed Tasks</h2>
 <div id="completedTasks"></div>
 
-<button onclick="downloadCSV()">Download CSV</button>
+<button onclick="downloadCSV()">Download CSV Report</button>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -117,7 +116,10 @@ function renderCompleted(){
 const div=document.getElementById("completedTasks");
 div.innerHTML="";
 
-tasksData.filter(t=>t.status==="completed").forEach(t=>{
+tasksData
+.filter(t=>t.status==="completed")
+.sort((a,b)=>b.completedTime-a.completedTime)
+.forEach(t=>{
 
 let delay=minutes(t.acceptedTime-t.created);
 let dur=minutes(t.completedTime-t.acceptedTime);
@@ -141,11 +143,16 @@ div.appendChild(row);
 
 function downloadCSV(){
 
-let csv="Trailer,Vehicle,Driver\n";
+let csv="Trailer,Vehicle,Driver,Delay,Duration\n";
 
-tasksData.filter(t=>t.status==="completed").forEach(t=>{
+tasksData
+.filter(t=>t.status==="completed")
+.forEach(t=>{
 
-csv+=`${t.trailer},${t.acceptedBy},${t.driver}\n`;
+let delay=minutes(t.acceptedTime-t.created);
+let dur=minutes(t.completedTime-t.acceptedTime);
+
+csv+=`${t.trailer},${t.acceptedBy},${t.driver},${delay},${dur}\n`;
 
 });
 
@@ -154,7 +161,7 @@ let url=URL.createObjectURL(blob);
 
 let a=document.createElement("a");
 a.href=url;
-a.download="report.csv";
+a.download="shunt-report.csv";
 a.click();
 
 }
@@ -162,34 +169,20 @@ a.click();
 function resetShunters(){
 
 if(confirm("Reset all shunters?")){
+
 db.ref("shunters").remove();
+
 }
 
 }
 
 function clearPower(){
 
-if(confirm("Clear power connections?")){
+if(confirm("Clear all power connections?")){
+
 db.ref("powerConnections").remove();
-}
 
 }
-
-function clearCompleted(){
-
-db.ref("tasks").once("value",snap=>{
-
-snap.forEach(child=>{
-
-let t=child.val();
-
-if(t.status==="completed"){
-db.ref("tasks/"+child.key).remove();
-}
-
-});
-
-});
 
 }
 
