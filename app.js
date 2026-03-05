@@ -1,174 +1,70 @@
-<!DOCTYPE html>
-<html>
-<head>
+function addTask(){
 
-<title>Manager Dashboard</title>
+const button=event.target
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="style.css">
-
-</head>
-
-<body>
-
-<h1>Manager Dashboard</h1>
-
-<h2>Create Task</h2>
-
-<select id="taskType" onchange="toggleTaskInputs()">
-<option value="move">Move Trailer</option>
-<option value="power">Provide Power (DD)</option>
-</select>
-
-<div id="moveFields">
-
-<input id="trailer" placeholder="Trailer Number">
-<input id="from" placeholder="From Location">
-<input id="to" placeholder="To Location">
-
-</div>
-
-<div id="powerFields" style="display:none">
-
-<input id="powerTrailer" placeholder="Trailer Number">
-
-<select id="bay">
-<option value="">Select Bay</option>
-
-<script>
-
-for(let i=1;i<=25;i++){
-document.write(`<option value="B${i}">B${i}</option>`)
-}
-
-for(let i=1;i<=26;i++){
-document.write(`<option value="C${i}">C${i}</option>`)
-}
-
-</script>
-
-</select>
-
-</div>
-
-<br>
-
-<button onclick="addTask()">Submit Task</button>
-
-<p id="msg"></p>
-
-<hr>
-
-<h2>Queue</h2>
-
-<div id="tasks"></div>
-
-<hr>
-
-<h2>Active Power</h2>
-
-<div id="powerConnections"></div>
-
-<hr>
-
-<h2>Shunters</h2>
-
-<div id="shunterStatus"></div>
-
-<script>
-
-function toggleTaskInputs(){
+button.disabled=true
+button.innerText="Submitting..."
 
 let type=document.getElementById("taskType").value
 
-document.getElementById("moveFields").style.display=(type==="move")?"block":"none"
-document.getElementById("powerFields").style.display=(type==="power")?"block":"none"
+let trailer=""
+let from=""
+let to=""
+let bay=""
+
+if(type==="move"){
+
+trailer=document.getElementById("trailer").value
+from=document.getElementById("from").value
+to=document.getElementById("to").value
+
+}else{
+
+trailer=document.getElementById("powerTrailer").value
+bay=document.getElementById("bay").value
 
 }
 
-</script>
+if(!trailer){
 
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+alert("Enter trailer number")
 
-<script src="config.js"></script>
-<script src="app.js"></script>
+button.disabled=false
+button.innerText="Submit Task"
 
-<script>
-
-function loadTasks(){
-
-db.ref("tasks").on("value",snapshot=>{
-
-const tasksDiv=document.getElementById("tasks")
-
-tasksDiv.innerHTML=""
-
-let tasks=[]
-
-snapshot.forEach(child=>{
-
-let t=child.val()
-t.id=child.key
-tasks.push(t)
-
-})
-
-tasks.sort((a,b)=>a.position-b.position)
-
-tasks.forEach((task,index)=>{
-
-const div=document.createElement("div")
-div.className="task"
-
-div.innerHTML=`
-
-${task.trailer} — ${task.type}<br>
-
-${task.from?task.from+" → "+task.to:"Bay "+task.bay}<br>
-
-${task.status}
-
-${task.acceptedBy?`<br>Accepted by: ${task.acceptedBy}`:""}
-
-`
-
-/* lock first 4 tasks */
-
-if(index>=4){
-
-const up=document.createElement("button")
-up.innerText="▲"
-up.onclick=()=>moveUp(task.id)
-
-const down=document.createElement("button")
-down.innerText="▼"
-down.onclick=()=>moveDown(task.id)
-
-div.appendChild(up)
-div.appendChild(down)
+return
 
 }
 
-/* delete button */
+db.ref("tasks").once("value",snap=>{
 
-const del=document.createElement("button")
-del.innerText="Delete"
-del.onclick=()=>deleteTask(task.id)
+let position=snap.numChildren()+1
 
-div.appendChild(del)
+db.ref("tasks").push({
 
-tasksDiv.appendChild(div)
+type:type==="move"?"Move Trailer":"Provide Power (DD)",
+trailer:trailer,
+from:from,
+to:to,
+bay:bay,
+status:"waiting",
+created:Date.now(),
+position:position
 
 })
+
+document.getElementById("msg").innerText="Task Added ✓"
+
+button.innerText="Task Added ✓"
+
+setTimeout(()=>{
+
+button.disabled=false
+button.innerText="Submit Task"
+document.getElementById("msg").innerText=""
+
+},5000)
 
 })
 
 }
-
-loadTasks()
-
-</script>
-
-</body>
-</html>
