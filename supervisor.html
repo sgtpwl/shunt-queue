@@ -1,183 +1,30 @@
 <!DOCTYPE html>
 <html>
 <head>
-
-<title>Supervisor - Shunt Queue</title>
-
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="style.css">
-
+  <title>Manager Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
-<h1>Supervisor</h1>
+<h1>Manager Login</h1>
 
-<div id="who"></div>
-
-<h2>Create Task</h2>
-
-<select id="taskType" onchange="toggleTaskInputs()">
-<option value="move">Move Trailer</option>
-<option value="power">Provide Power (DD)</option>
-</select>
-
+<input id="name" placeholder="Enter your name">
 <br><br>
 
-<label>
-<input type="checkbox" id="priority">
-Gatehouse Priority
-</label>
-
-<br><br>
-
-<div id="moveFields">
-
-<input id="trailer" placeholder="Trailer Number">
-<input id="from" placeholder="From Location">
-<input id="to" placeholder="To Location">
-
-<br><br>
-
-<select id="loadType">
-<option value="Full Load">Full Load</option>
-<option value="Empty Trailer">Empty Trailer</option>
-<option value="Trunk Trailer">Trunk Trailer</option>
-</select>
-
-</div>
-
-<div id="powerFields" style="display:none">
-
-<input id="powerTrailer" placeholder="Trailer Number">
-
-<br><br>
-
-<select id="bay">
-<option value="">Select Bay</option>
-</select>
-
-</div>
-
-<br><br>
-
-<button onclick="addTask(this)">Submit Task</button>
-
-<p id="msg"></p>
-
-<hr>
-
-<h2>Queue</h2>
-
-<div id="queue"></div>
+<button onclick="login()">Login</button>
 
 <script>
-
-function toggleTaskInputs(){
-
-let type=document.getElementById("taskType").value
-
-document.getElementById("moveFields").style.display=(type==="move")?"block":"none"
-document.getElementById("powerFields").style.display=(type==="power")?"block":"none"
-
+function login(){
+  const name = (document.getElementById("name").value || "").trim();
+  if(!name){
+    alert("Enter your name");
+    return;
+  }
+  localStorage.setItem("userName", name);
+  localStorage.setItem("userRole", "Manager");
+  window.location.href = "manager.html";
 }
-
-/* Populate bays */
-
-let baySelect=document.getElementById("bay")
-
-for(let i=1;i<=25;i++){
-
-let option=document.createElement("option")
-option.value="B"+i
-option.innerText="B"+i
-baySelect.appendChild(option)
-
-}
-
-for(let i=1;i<=26;i++){
-
-let option=document.createElement("option")
-option.value="C"+i
-option.innerText="C"+i
-baySelect.appendChild(option)
-
-}
-
-/* Show supervisor name */
-
-document.getElementById("who").innerHTML="Logged in as: "+localStorage.getItem("userName")
-
-/* Load queue */
-
-function loadQueue(){
-
-db.ref("tasks").on("value",snap=>{
-
-let div=document.getElementById("queue")
-
-div.innerHTML=""
-
-let tasks=[]
-
-snap.forEach(child=>{
-let t=child.val()
-t.id=child.key
-tasks.push(t)
-})
-
-tasks.sort((a,b)=>a.position-b.position)
-
-tasks.forEach((task,index)=>{
-
-let priority=task.priority ? "⚠ PRIORITY<br>" : ""
-
-let load=task.loadType ? task.loadType+"<br>" : ""
-
-let requester="Requested by: "+task.requestedBy
-
-let row=document.createElement("div")
-
-row.className="task"
-
-row.innerHTML=`
-
-<b>${index+1}. ${task.trailer}</b><br>
-
-${priority}
-
-${task.type}<br>
-
-${task.from ? task.from+" → "+task.to : "Bay "+task.bay}<br>
-
-${load}
-
-${requester}<br>
-
-Status: ${task.status}
-
-`
-
-div.appendChild(row)
-
-})
-
-})
-
-}
-
-</script>
-
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
-<script src="config.js"></script>
-<script src="app.js"></script>
-
-<script>
-
-loadQueue()
-
 </script>
 
 </body>
