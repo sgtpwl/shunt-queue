@@ -14,13 +14,16 @@
 
 <h1>Admin Dashboard</h1>
 
-<h2>Completed Tasks</h2>
+<button onclick="downloadCSV()">Download CSV Report</button>
 
-<div id="completedTasks"></div>
+<h2>System Stats</h2>
+<div id="systemStats"></div>
 
 <h2>Shunter Performance</h2>
-
 <div id="shunterStats"></div>
+
+<h2>Completed Tasks</h2>
+<div id="completedTasks"></div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -30,35 +33,47 @@
 <script>
 
 function minutes(ms){
-
 return Math.floor(ms/60000);
-
 }
 
-function loadCompletedTasks(){
+let completedList=[];
 
-const div=document.getElementById("completedTasks");
+function loadData(){
 
 db.ref("tasks").on("value",snapshot=>{
 
-div.innerHTML="";
-
 let tasks=[];
+completedList=[];
 
 snapshot.forEach(child=>{
-
 let t=child.val();
 t.id=child.key;
+tasks.push(t);
+});
 
-if(t.status==="completed") tasks.push(t);
+tasks = tasks.filter(t=>t.status==="completed");
+
+completedList=tasks;
+
+showCompleted(tasks);
+showStats(tasks);
+showShunterStats(tasks);
 
 });
+
+}
+
+function showCompleted(tasks){
+
+const div=document.getElementById("completedTasks");
+
+div.innerHTML="";
 
 tasks.sort((a,b)=>b.completedTime-a.completedTime);
 
 tasks.forEach(t=>{
 
-let startDelay = t.acceptedTime - t.created;
+let delay = t.acceptedTime - t.created;
 let duration = t.completedTime - t.acceptedTime;
 
 const row=document.createElement("div");
@@ -70,7 +85,7 @@ row.innerHTML=`
 <br>
 Vehicle: ${t.acceptedBy}
 <br>
-Start Delay: ${minutes(startDelay)} min
+Start Delay: ${minutes(delay)} min
 <br>
 Duration: ${minutes(duration)} min
 `;
@@ -79,32 +94,69 @@ div.appendChild(row);
 
 });
 
-});
+}
+
+function showStats(tasks){
+
+const div=document.getElementById("systemStats");
+
+let todayCount=0;
+let totalDuration=0;
+let totalDelay=0;
+let powerJobs=0;
+
+const todayStart = new Date().setHours(0,0,0,0);
+
+tasks.forEach(t=>{
+
+if(t.completedTime > todayStart){
+
+todayCount++;
+
+totalDuration += (t.completedTime - t.acceptedTime);
+totalDelay += (t.acceptedTime - t.created);
+
+if(t.type==="Provide Power (DD)") powerJobs++;
 
 }
 
-function loadShunterStats(){
+});
+
+let avgDur = todayCount ? minutes(totalDuration/todayCount) : 0;
+let avgDelay = todayCount ? minutes(totalDelay/todayCount) : 0;
+
+div.innerHTML=`
+
+Tasks Today: ${todayCount}
+<br>
+Average Job Time: ${avgDur} min
+<br>
+Average Start Delay: ${avgDelay} min
+<br>
+Power Jobs: ${powerJobs}
+
+`;
+
+}
+
+function showShunterStats(tasks){
 
 const div=document.getElementById("shunterStats");
 
-db.ref("tasks").on("value",snapshot=>{
-
 let stats={};
 
-snapshot.forEach(child=>{
+tasks.forEach(t=>{
 
-const t=child.val();
-
-if(t.status!=="completed") return;
-
-const v=t.acceptedBy;
+let v=t.acceptedBy;
 
 if(!stats[v]){
 
 stats[v]={
 jobs:0,
 duration:0,
-delay:0
+delay:0,
+idle:0,
+lastComplete:null
 };
 
 }
@@ -112,8 +164,15 @@ delay:0
 stats[v].jobs++;
 
 stats[v].duration += (t.completedTime - t.acceptedTime);
-
 stats[v].delay += (t.acceptedTime - t.created);
+
+if(stats[v].lastComplete){
+
+stats[v].idle += (t.acceptedTime - stats[v].lastComplete);
+
+}
+
+stats[v].lastComplete = t.completedTime;
 
 });
 
@@ -121,35 +180,63 @@ div.innerHTML="";
 
 Object.keys(stats).forEach(v=>{
 
-const s=stats[v];
+let s=stats[v];
 
-const avgDuration = minutes(s.duration/s.jobs);
-const avgDelay = minutes(s.delay/s.jobs);
+let avgDur = minutes(s.duration/s.jobs);
+let avgDelay = minutes(s.delay/s.jobs);
+let avgIdle = s.jobs>1 ? minutes(s.idle/(s.jobs-1)) : 0;
 
 const row=document.createElement("div");
 
 row.className="task";
 
 row.innerHTML=`
+
 <b>${v}</b>
 <br>
 Jobs: ${s.jobs}
 <br>
 Avg Start Delay: ${avgDelay} min
 <br>
-Avg Job Time: ${avgDuration} min
+Avg Job Time: ${avgDur} min
+<br>
+Avg Idle Time: ${avgIdle} min
+
 `;
 
 div.appendChild(row);
 
 });
 
+}
+
+function downloadCSV(){
+
+let csv="Trailer,Vehicle,StartDelay,Duration\n";
+
+completedList.forEach(t=>{
+
+let delay = minutes(t.acceptedTime - t.created);
+let duration = minutes(t.completedTime - t.acceptedTime);
+
+csv += `${t.trailer},${t.acceptedBy},${delay},${duration}\n`;
+
 });
+
+const blob=new Blob([csv],{type:'text/csv'});
+
+const url=URL.createObjectURL(blob);
+
+const a=document.createElement("a");
+
+a.href=url;
+a.download="shunt-report.csv";
+
+a.click();
 
 }
 
-loadCompletedTasks();
-loadShunterStats();
+loadData();
 
 </script>
 
