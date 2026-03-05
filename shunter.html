@@ -1,205 +1,111 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Manager - Shunt Queue</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="style.css">
+
+<title>Shunter</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="style.css">
+
 </head>
 
 <body>
 
-<h1>Manager</h1>
+<h1>Shunter Screen</h1>
 
-<h2>Create Task</h2>
-
-<select id="taskType" onchange="toggleTaskInputs()">
-  <option value="move">Move Trailer</option>
-  <option value="power">Provide Power (DD)</option>
-</select>
-
-<div style="margin-top:8px;">
-  <label>
-    <input type="checkbox" id="priority">
-    Gatehouse Priority
-  </label>
-</div>
-
-<div id="moveFields" style="margin-top:10px;">
-  <input id="trailer" placeholder="Trailer Number">
-  <input id="from" placeholder="From Location">
-  <input id="to" placeholder="To Location">
-
-  <select id="loadType">
-    <option>Full Load</option>
-    <option>Empty Trailer</option>
-    <option selected>Trunk Trailer</option>
-  </select>
-</div>
-
-<div id="powerFields" style="display:none; margin-top:10px;">
-  <input id="powerTrailer" placeholder="Trailer Number">
-  <select id="bay">
-    <option value="">Select Bay</option>
-  </select>
-</div>
-
-<br>
-<button onclick="addTask(this)">Submit Task</button>
-<p id="msg"></p>
-
-<hr>
-
-<h2>Queue</h2>
-<div id="tasks"></div>
-
-<hr>
-
-<h2>Active Power</h2>
-<div id="powerConnections"></div>
-
-<hr>
-
-<h2>Shunters</h2>
-<div id="shunterStatus"></div>
-
-<script>
-  function toggleTaskInputs(){
-    const type = document.getElementById("taskType").value;
-    document.getElementById("moveFields").style.display = (type==="move") ? "block" : "none";
-    document.getElementById("powerFields").style.display = (type==="power") ? "block" : "none";
-  }
-
-  // populate bays
-  (function(){
-    const bay = document.getElementById("bay");
-    for (let i=1;i<=25;i++){
-      const o=document.createElement("option");
-      o.value="B"+i; o.innerText="B"+i;
-      bay.appendChild(o);
-    }
-    for (let i=1;i<=26;i++){
-      const o=document.createElement("option");
-      o.value="C"+i; o.innerText="C"+i;
-      bay.appendChild(o);
-    }
-  })();
-</script>
+<div id="task"></div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
 <script src="config.js"></script>
 <script src="app.js"></script>
 
 <script>
-  function renderManagerQueue(){
-    db.ref("tasks").on("value", snap => {
 
-      const div = document.getElementById("tasks");
-      div.innerHTML = "";
+function loadTask(){
 
-      let tasks = [];
-      snap.forEach(child=>{
-        let t = child.val() || {};
-        t.id = child.key;
-        tasks.push(t);
-      });
+let vehicle=localStorage.getItem("vehicle")
 
-      tasks.sort((a,b)=>(a.position||0)-(b.position||0));
+db.ref("tasks").on("value",snap=>{
 
-      tasks.forEach((t, idx)=>{
-        const row=document.createElement("div");
-        row.className="task";
+let tasks=[]
 
-        const pri = t.priority ? "⚠ PRIORITY<br>" : "";
-        const loc = (t.type==="Move Trailer")
-          ? `${t.from || ""} → ${t.to || ""}<br>${(t.loadType || "").toUpperCase()}`
-          : `Bay ${t.bay || ""}`;
+snap.forEach(child=>{
+let t=child.val()
+t.id=child.key
+tasks.push(t)
+})
 
-        let html = `
-          <b>${idx+1}. ${t.trailer || ""}</b><br>
-          ${pri}
-          ${t.type || ""}<br>
-          ${loc}<br>
-          Status: ${t.status || ""}
-        `;
+tasks=tasks.filter(t=>t.status!=="completed")
 
-        if (t.status === "accepted") {
-          html += `<br>Accepted: ${t.acceptedBy || ""} (${t.driver || ""})`;
-        }
+tasks.sort((a,b)=>a.position-b.position)
 
-        row.innerHTML = html;
+let myTask=tasks.find(t=>t.status==="accepted" && t.acceptedBy===vehicle)
 
-        // Reorder buttons: only for waiting tasks, and only after first 4 (idx >= 4)
-        if (t.status === "waiting" && idx >= 4) {
-          const up=document.createElement("button");
-          up.innerText="▲";
-          up.onclick=()=>moveUp(t.id);
+let nextTask=tasks.find(t=>t.status==="waiting")
 
-          const down=document.createElement("button");
-          down.innerText="▼";
-          down.onclick=()=>moveDown(t.id);
+let task=myTask || nextTask
 
-          row.appendChild(up);
-          row.appendChild(down);
-        }
+let div=document.getElementById("task")
 
-        // Delete: only waiting tasks
-        if (t.status === "waiting") {
-          const del=document.createElement("button");
-          del.innerText="Delete";
-          del.onclick=()=>deleteTask(t.id);
-          row.appendChild(del);
-        }
+if(!task){
 
-        div.appendChild(row);
-      });
+div.innerHTML="No tasks waiting"
+return
 
-    });
-  }
+}
 
-  function renderPower(){
-    db.ref("powerConnections").on("value", snap => {
-      const div=document.getElementById("powerConnections");
-      div.innerHTML="";
+let priority=task.priority ? "⚠ PRIORITY<br>" : ""
 
-      snap.forEach(child=>{
-        const v=child.key;
-        const p=child.val() || {};
-        if (p.status !== "connected") return;
+let load=task.loadType ? task.loadType.toUpperCase()+"<br>" : ""
 
-        const row=document.createElement("div");
-        row.className="task";
+let requester=`Requested by: ${task.requestedBy}`
 
-        const btn=document.createElement("button");
-        btn.innerText="Finish Power";
-        btn.onclick=()=>finishPower(v, btn);
+let html=`
 
-        row.innerHTML = `<b>${v}</b> ⚡ Bay ${p.bay || ""} — ${p.trailer || ""}<br>`;
-        row.appendChild(btn);
-        div.appendChild(row);
-      });
-    });
-  }
+<h2>${task.trailer}</h2>
 
-  function renderShunters(){
-    db.ref("shunters").on("value", snap => {
-      const div=document.getElementById("shunterStatus");
-      div.innerHTML="";
+${priority}
 
-      snap.forEach(child=>{
-        const v=child.key;
-        const s=child.val() || {};
-        const row=document.createElement("div");
-        row.className="task";
-        row.innerHTML = `<b>${v}</b> — ${s.driver || ""} — ${s.status || ""}`;
-        div.appendChild(row);
-      });
-    });
-  }
+${task.type}<br>
 
-  renderManagerQueue();
-  renderPower();
-  renderShunters();
+${task.from ? task.from+" → "+task.to : "Bay "+task.bay}<br>
+
+${load}
+
+${requester}
+
+<br><br>
+
+`
+
+if(task.status==="waiting"){
+
+html+=`<button onclick="acceptTask('${task.id}')">Accept</button>`
+
+}
+
+if(task.status==="accepted" && task.acceptedBy===vehicle){
+
+html+=`<button onclick="completeTask('${task.id}')">Complete</button>`
+
+if(task.priority){
+
+html+=`<br><br><button onclick="notifyGatehouse('${task.id}')">Notify Gatehouse Bay Cleared</button>`
+
+}
+
+}
+
+div.innerHTML=html
+
+})
+
+}
+
+loadTask()
+
 </script>
 
 </body>
