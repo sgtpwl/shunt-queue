@@ -1,81 +1,78 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Supervisor - Shunt Tasks</title>
-<link rel="stylesheet" href="style.css">
+<title>Supervisor - Shunt Queue</title>
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="style.css">
+
 </head>
 
 <body>
 
-<h1>Create Task</h1>
+<h1>Supervisor Task Entry</h1>
 
-<select id="taskType" onchange="updateInputs()">
+<h2>Create Task</h2>
+
+<select id="taskType" onchange="toggleTaskInputs()">
 <option value="move">Move Trailer</option>
 <option value="power">Provide Power (DD)</option>
 </select>
 
-<div id="moveInputs">
-<input id="trailer" placeholder="Trailer">
-<input id="from" placeholder="From">
-<input id="to" placeholder="To">
+<div id="moveFields">
+
+<input id="trailer" placeholder="Trailer Number">
+<input id="from" placeholder="From Location">
+<input id="to" placeholder="To Location">
+
 </div>
 
-<div id="powerInputs" style="display:none;">
-<input id="powerTrailer" placeholder="Trailer">
-<select id="bay"></select>
-</div>
+<div id="powerFields" style="display:none">
 
-<button onclick="addTask()">Add Task</button>
+<input id="powerTrailer" placeholder="Trailer Number">
 
-<div id="msg"></div>
-
-<h2>Finish Power</h2>
-<div id="powerList"></div>
-
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-<script src="config.js"></script>
-<script src="app.js"></script>
-
+<select id="bay">
+<option value="">Select Bay</option>
 <script>
 
-function updateInputs(){
-
-const type=document.getElementById("taskType").value;
-
-document.getElementById("moveInputs").style.display=type==="move"?"block":"none";
-document.getElementById("powerInputs").style.display=type==="power"?"block":"none";
-
-}
-
-function populateBays(){
-
-const select=document.getElementById("bay");
-
 for(let i=1;i<=25;i++){
-
-let o=document.createElement("option");
-o.value="B"+i;
-o.innerText="B"+i;
-select.appendChild(o);
-
+document.write(`<option value="B${i}">B${i}</option>`)
 }
 
 for(let i=1;i<=26;i++){
-
-let o=document.createElement("option");
-o.value="C"+i;
-o.innerText="C"+i;
-select.appendChild(o);
-
+document.write(`<option value="C${i}">C${i}</option>`)
 }
-
-}
-
-populateBays();
 
 </script>
+
+</select>
+
+</div>
+
+<br>
+
+<button onclick="addTask()">Submit Task</button>
+
+<p id="msg"></p>
+
+<script>
+
+function toggleTaskInputs(){
+
+let type=document.getElementById("taskType").value
+
+document.getElementById("moveFields").style.display=(type==="move")?"block":"none"
+document.getElementById("powerFields").style.display=(type==="power")?"block":"none"
+
+}
+
+</script>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<script src="config.js"></script>
+<script src="app.js" defer></script>
 
 </body>
 </html>
