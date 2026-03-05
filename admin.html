@@ -24,6 +24,7 @@ padding:10px 18px;
 font-size:16px;
 border-radius:4px;
 cursor:pointer;
+margin-bottom:20px;
 }
 
 button:hover{
@@ -49,6 +50,7 @@ border-left:6px solid red;
 padding:12px;
 margin-bottom:10px;
 border-radius:4px;
+font-weight:bold;
 }
 
 </style>
@@ -89,6 +91,8 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 
+/* LIVE YARD STATUS */
+
 function loadYardStatus(){
 
 const container = document.getElementById("yardStatus");
@@ -102,16 +106,41 @@ snapshot.forEach(child => {
 const v = child.val();
 const vehicle = child.key;
 
-let status = "Available";
-
-if(v.onBreak) status = "On Break";
-if(v.currentTask) status = "Working task " + v.currentTask;
-
 const div = document.createElement("div");
 div.className = "vehicle";
-div.innerText = vehicle + " — " + status;
+
+if(v.onBreak){
+
+div.innerText = vehicle + " — On Break";
 
 container.appendChild(div);
+
+}
+
+else if(v.currentTask){
+
+const taskId = v.currentTask;
+
+const span = document.createElement("span");
+span.id = "timer_" + vehicle;
+
+div.innerHTML = vehicle + " — Working task " + taskId + " (";
+div.appendChild(span);
+div.innerHTML += ")";
+
+container.appendChild(div);
+
+startTimer(vehicle,taskId);
+
+}
+
+else{
+
+div.innerText = vehicle + " — Available";
+
+container.appendChild(div);
+
+}
 
 });
 
@@ -119,6 +148,42 @@ container.appendChild(div);
 
 }
 
+
+/* TASK TIMER */
+
+function startTimer(vehicle,taskId){
+
+db.ref("tasks/" + taskId).once("value", snapshot => {
+
+const t = snapshot.val();
+
+if(!t || !t.startedAt) return;
+
+const start = t.startedAt;
+
+setInterval(()=>{
+
+const elapsed = Math.floor((Date.now() - start) / 1000);
+
+const mins = Math.floor(elapsed/60);
+const secs = elapsed % 60;
+
+const display =
+String(mins).padStart(2,"0") + ":" +
+String(secs).padStart(2,"0");
+
+const el = document.getElementById("timer_"+vehicle);
+
+if(el) el.innerText = display;
+
+},1000);
+
+});
+
+}
+
+
+/* ALERT SYSTEM */
 
 function checkAlerts(){
 
@@ -133,7 +198,7 @@ const t = child.val();
 
 if(t.status === "active" && t.startedAt){
 
-const runningTime = (Date.now() - t.startedAt) / 60000;
+const runningTime = (Date.now() - t.startedAt)/60000;
 
 if(runningTime > 15){
 
@@ -141,9 +206,8 @@ const div = document.createElement("div");
 div.className = "alert";
 
 div.innerText =
-"⚠ Task " + child.key +
-" running " +
-Math.round(runningTime) +
+"🚨 Task "+child.key+
+" running "+Math.round(runningTime)+
 " minutes";
 
 alertBox.appendChild(div);
@@ -158,6 +222,8 @@ alertBox.appendChild(div);
 
 }
 
+
+/* CSV EXPORT */
 
 function downloadCSV(){
 
@@ -179,7 +245,7 @@ csv +=
 
 });
 
-const blob = new Blob([csv], { type: "text/csv" });
+const blob = new Blob([csv],{type:"text/csv"});
 const url = URL.createObjectURL(blob);
 
 const a = document.createElement("a");
@@ -192,8 +258,12 @@ a.click();
 }
 
 
+/* INITIAL LOAD */
+
 loadYardStatus();
 checkAlerts();
+
+/* ALERT CHECK EVERY MINUTE */
 
 setInterval(checkAlerts,60000);
 
