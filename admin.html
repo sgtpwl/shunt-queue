@@ -322,6 +322,68 @@
     a.click();
   }
 
+function checkAlerts(){
+
+const alerts=[];
+
+const now=Date.now();
+
+tasksData.forEach(t=>{
+
+if(t.status==="waiting" && t.created){
+
+const wait=(now-t.created)/60000;
+
+if(wait>10){
+
+alerts.push(`⚠ Trailer ${t.trailer} waiting ${Math.floor(wait)} min`);
+
+}
+
+}
+
+if(t.status==="accepted" && t.acceptedTime){
+
+const dur=(now-t.acceptedTime)/60000;
+
+if(dur>30){
+
+alerts.push(`⚠ ${t.acceptedBy} working ${Math.floor(dur)} min`);
+
+}
+
+}
+
+});
+
+Object.keys(powerData).forEach(v=>{
+
+const p=powerData[v];
+
+if(p.status==="connected" && p.time){
+
+const dur=(now-p.time)/60000;
+
+if(dur>45){
+
+alerts.push(`⚠ ${v} power connected ${Math.floor(dur)} min`);
+
+}
+
+}
+
+});
+
+const div=document.getElementById("alerts");
+
+div.innerHTML=alerts.join("<br>");
+
+}
+
+
+
+
+  
   loadAll();
 </script>
 
