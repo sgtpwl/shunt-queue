@@ -1,149 +1,99 @@
 <!DOCTYPE html>
 <html>
 <head>
+
 <title>Manager - Shunt Queue</title>
-<link rel="stylesheet" href="style.css">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="style.css">
+
 </head>
 
 <body>
 
-<h1>Shunt Queue</h1>
+<h1>Manager Dashboard</h1>
 
-<h2>Queue</h2>
-<div id="tasks"></div>
+<h2>Create Task</h2>
 
-<h2>Active Power</h2>
-<div id="powerList"></div>
+<select id="taskType" onchange="toggleTaskInputs()">
+<option value="move">Move Trailer</option>
+<option value="power">Provide Power (DD)</option>
+</select>
 
-<h2>Shunter Status</h2>
-<div id="shunters"></div>
+<div id="moveFields">
 
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-<script src="config.js"></script>
-<script src="app.js"></script>
+<input id="trailer" placeholder="Trailer Number">
+<input id="from" placeholder="From Location">
+<input id="to" placeholder="To Location">
+
+</div>
+
+<div id="powerFields" style="display:none">
+
+<input id="powerTrailer" placeholder="Trailer Number">
+
+<select id="bay">
+<option value="">Select Bay</option>
 
 <script>
 
-function renderManager(){
-
-db.ref("tasks").on("value",snapshot=>{
-
-const div=document.getElementById("tasks");
-div.innerHTML="";
-
-let tasks=[];
-
-snapshot.forEach(child=>{
-let t=child.val();
-t.id=child.key;
-tasks.push(t);
-});
-
-tasks.sort((a,b)=>a.position-b.position);
-
-tasks.forEach((t,i)=>{
-
-let row=document.createElement("div");
-row.className="task";
-
-let html=`<b>${t.trailer}</b> - ${t.type}<br>`;
-
-if(t.acceptedBy){
-html+=`Accepted by ${t.acceptedBy} (${t.driver})<br>`;
-}else{
-html+=`Waiting<br>`;
+for(let i=1;i<=25;i++){
+document.write(`<option value="B${i}">B${i}</option>`)
 }
 
-if(i>3 && !t.acceptedBy){
-
-html+=`
-<button onclick="moveUp('${t.id}')">↑</button>
-<button onclick="moveDown('${t.id}')">↓</button>
-`;
-
+for(let i=1;i<=26;i++){
+document.write(`<option value="C${i}">C${i}</option>`)
 }
-
-if(!t.acceptedBy){
-
-html+=`
-<button onclick="deleteTask('${t.id}')">Delete</button>
-`;
-
-}
-
-row.innerHTML=html;
-div.appendChild(row);
-
-});
-
-});
-
-}
-
-function renderPower(){
-
-db.ref("powerConnections").on("value",snapshot=>{
-
-const div=document.getElementById("powerList");
-div.innerHTML="";
-
-snapshot.forEach(child=>{
-
-let p=child.val();
-
-if(p.status==="connected"){
-
-let row=document.createElement("div");
-row.className="task";
-
-row.innerHTML=`
-${child.key} powering ${p.trailer} at bay ${p.bay}
-<button onclick="finishPower('${child.key}')">Finish Power</button>
-`;
-
-div.appendChild(row);
-
-}
-
-});
-
-});
-
-}
-
-function renderShunters(){
-
-db.ref("shunters").on("value",snapshot=>{
-
-const div=document.getElementById("shunters");
-div.innerHTML="";
-
-snapshot.forEach(child=>{
-
-let s=child.val();
-
-let row=document.createElement("div");
-row.className="task";
-
-row.innerHTML=`
-${child.key} - ${s.driver} - ${s.status}
-`;
-
-div.appendChild(row);
-
-});
-
-});
-
-}
-
-renderManager();
-renderPower();
-renderShunters();
 
 </script>
+
+</select>
+
+</div>
+
+<br>
+
+<button onclick="addTask()">Submit Task</button>
+
+<p id="msg"></p>
+
+<hr>
+
+<h2>Active Power</h2>
+
+<div id="powerConnections"></div>
+
+<hr>
+
+<h2>Queue</h2>
+
+<div id="tasks"></div>
+
+<hr>
+
+<h2>Shunters</h2>
+
+<div id="shunterStatus"></div>
+
+<script>
+
+function toggleTaskInputs(){
+
+let type=document.getElementById("taskType").value
+
+document.getElementById("moveFields").style.display=(type==="move")?"block":"none"
+document.getElementById("powerFields").style.display=(type==="power")?"block":"none"
+
+}
+
+</script>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<script src="config.js"></script>
+<script src="app.js" defer></script>
 
 </body>
 </html>
