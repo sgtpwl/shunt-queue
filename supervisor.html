@@ -95,6 +95,9 @@ function toggleTaskInputs(){
 function populateBays(){
   const baySelect = document.getElementById("bay");
 
+  // clear any existing
+  baySelect.innerHTML = '<option value="">Select Bay</option>';
+
   for(let i=1;i<=25;i++){
     const opt=document.createElement("option");
     opt.value="B"+i;
