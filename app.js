@@ -1,49 +1,3 @@
-function addTask(button) {
-
-const trailer = document.getElementById("trailer")?.value || "";
-const from = document.getElementById("from")?.value || "";
-const to = document.getElementById("to")?.value || "";
-const type = document.getElementById("type")?.value || "";
-const bay = document.getElementById("bay")?.value || "";
-
-if (!trailer) {
-alert("Enter trailer number");
-return;
-}
-
-button.disabled = true;
-button.innerText = "Submitting...";
-
-db.ref("tasks").once("value", snapshot => {
-
-const position = snapshot.numChildren() + 1;
-
-db.ref("tasks").push({
-trailer,
-from,
-to,
-bay,
-type,
-status: "waiting",
-position: position,
-created: Date.now()
-}).then(() => {
-
-button.innerText = "Task Added ✓";
-
-setTimeout(() => {
-button.disabled = false;
-button.innerText = "Submit Task";
-}, 1500);
-
-});
-
-});
-
-}
-
-
-
 function moveUp(id){
 
 db.ref("tasks").once("value",snapshot=>{
@@ -60,7 +14,9 @@ tasks.sort((a,b)=>a.position-b.position);
 
 let index=tasks.findIndex(t=>t.id===id);
 
-if(index<=0) return;
+if(index<=3) return;
+
+if(tasks[index].status!=="waiting") return;
 
 const temp=tasks[index];
 tasks[index]=tasks[index-1];
@@ -92,7 +48,9 @@ tasks.sort((a,b)=>a.position-b.position);
 
 let index=tasks.findIndex(t=>t.id===id);
 
-if(index>=tasks.length-1) return;
+if(index<3) return;
+
+if(tasks[index].status!=="waiting") return;
 
 const temp=tasks[index];
 tasks[index]=tasks[index+1];
@@ -108,65 +66,33 @@ db.ref("tasks/"+t.id+"/position").set(i+1);
 
 
 
-function finishPower(shunter, button){
+function deleteTask(id){
 
-button.disabled = true;
-button.innerText = "Finishing...";
+if(!confirm("Delete this task?")) return;
 
-db.ref("powerConnections/"+shunter).update({
-status:"readyToDisconnect"
-}).then(()=>{
-
-button.innerText="Finished ✓";
-
-});
+db.ref("tasks/"+id).remove();
 
 }
 
 
 
-function loadTasks() {
+function clearPower(vehicle){
 
-const tasksDiv = document.getElementById("tasks");
+if(!confirm("Clear power connection?")) return;
 
-if(!tasksDiv) return;
+db.ref("powerConnections/"+vehicle).remove();
 
-db.ref("tasks").on("value", snapshot => {
+}
 
-tasksDiv.innerHTML = "";
 
-let tasks=[];
 
-snapshot.forEach(child=>{
-let t=child.val();
-t.id=child.key;
-tasks.push(t);
-});
+function finishPower(vehicle,button){
 
-tasks.sort((a,b)=>a.position-b.position);
+button.disabled=true;
+button.innerText="Finishing...";
 
-tasks.forEach(task=>{
-
-const div = document.createElement("div");
-div.className="task";
-
-div.innerHTML=`
-<b>${task.trailer}</b> — ${task.type}<br>
-${task.bay ? "Bay "+task.bay : ""}
-<br>${task.from || ""} ${task.to ? "→ "+task.to : ""}
-<br><i>${task.status}</i>
-${task.acceptedBy ? `<br><b>Accepted by:</b> ${task.acceptedBy}` : ""}
-
-<br><br>
-
-<button onclick="moveUp('${task.id}')">▲</button>
-<button onclick="moveDown('${task.id}')">▼</button>
-`;
-
-tasksDiv.appendChild(div);
-
-});
-
+db.ref("powerConnections/"+vehicle).update({
+status:"readyToDisconnect"
 });
 
 }
@@ -186,18 +112,15 @@ div.innerHTML="";
 snapshot.forEach(child=>{
 
 const p=child.val();
-const shunter=child.key;
+const vehicle=child.key;
 
 const row=document.createElement("div");
 
-row.className="task";
-
 row.innerHTML=`
-⚡ ${p.bay} — ${p.trailer} — ${shunter}
+⚡ ${vehicle} — Bay ${p.bay} — ${p.trailer}
 <br>
-<button onclick="finishPower('${shunter}', this)">
-FINISH POWER
-</button>
+<button onclick="finishPower('${vehicle}',this)">Finish</button>
+<button onclick="clearPower('${vehicle}')">Clear</button>
 `;
 
 div.appendChild(row);
@@ -207,72 +130,3 @@ div.appendChild(row);
 });
 
 }
-
-
-
-function loadShunterStatus(){
-
-const div=document.getElementById("shunterStatus");
-
-if(!div) return;
-
-function refresh(){
-
-db.ref("shunters").once("value",snapshot=>{
-
-div.innerHTML="";
-
-snapshot.forEach(child=>{
-
-const name=child.key;
-const data=child.val();
-
-const row=document.createElement("div");
-
-if(data.status==="power"){
-
-row.innerHTML=`${name} — ⚡ Power`;
-
-}else if(data.status==="busy"){
-
-row.innerHTML=`${name} — Moving trailer`;
-
-}else if(data.status==="break"){
-
-let minutes=0;
-
-if(data.breakStart){
-minutes=Math.floor((Date.now()-data.breakStart)/60000);
-}
-
-row.innerHTML=`${name} — Break (${minutes} min)`;
-
-}else{
-
-row.innerHTML=`${name} — Available`;
-
-}
-
-div.appendChild(row);
-
-});
-
-});
-
-}
-
-refresh();
-
-setInterval(refresh,60000);
-
-}
-
-
-
-window.onload=function(){
-
-loadTasks();
-loadPowerConnections();
-loadShunterStatus();
-
-};
