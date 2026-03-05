@@ -1,190 +1,132 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Shunter Tasks</title>
-<link rel="stylesheet" href="style.css">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Supervisor - Shunt Queue</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-<div style="display:flex;justify-content:space-between;padding:10px;align-items:center;">
+<h1>Supervisor</h1>
 
-<h2 id="vehicleInfo"></h2>
+<h2>Create Task</h2>
 
-<div>
-<button onclick="setBreak()">Break</button>
-<button onclick="backFromBreak()">Back</button>
-<button onclick="endShift()">End Shift</button>
+<select id="taskType" onchange="toggleTaskInputs()">
+  <option value="move">Move Trailer</option>
+  <option value="power">Provide Power (DD)</option>
+</select>
+
+<div style="margin-top:8px;">
+  <label>
+    <input type="checkbox" id="priority">
+    Gatehouse Priority
+  </label>
 </div>
 
+<div id="moveFields" style="margin-top:10px;">
+
+  <input id="trailer" placeholder="Trailer Number">
+  <input id="from" placeholder="From Location">
+  <input id="to" placeholder="To Location">
+
+  <select id="loadType">
+    <option>Full Load</option>
+    <option>Empty Trailer</option>
+    <option selected>Trunk Trailer</option>
+  </select>
+
 </div>
 
-<h1 style="text-align:center;">Task</h1>
+<div id="powerFields" style="display:none; margin-top:10px;">
 
-<div id="screen" style="padding:20px;text-align:center;">Loading...</div>
+  <input id="powerTrailer" placeholder="Trailer Number">
+
+  <select id="bay">
+    <option value="">Select Bay</option>
+  </select>
+
+</div>
+
+<br>
+
+<button onclick="addTask(this)">Submit Task</button>
+
+<p id="msg"></p>
+
+<hr>
+
+<h2>Queue (Read Only)</h2>
+<div id="queue"></div>
+
+<script>
+  function toggleTaskInputs(){
+    const type = document.getElementById("taskType").value;
+    document.getElementById("moveFields").style.display = (type==="move") ? "block" : "none";
+    document.getElementById("powerFields").style.display = (type==="power") ? "block" : "none";
+  }
+
+  // populate bays
+  (function(){
+    const bay = document.getElementById("bay");
+    for (let i=1;i<=25;i++){
+      const o=document.createElement("option");
+      o.value="B"+i; o.innerText="B"+i;
+      bay.appendChild(o);
+    }
+    for (let i=1;i<=26;i++){
+      const o=document.createElement("option");
+      o.value="C"+i; o.innerText="C"+i;
+      bay.appendChild(o);
+    }
+  })();
+</script>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script src="config.js"></script>
+<script src="app.js"></script>
 
 <script>
+  function renderQueue(){
+    db.ref("tasks").on("value", snap => {
+      const div = document.getElementById("queue");
+      div.innerHTML = "";
 
-function vehicle(){
-return localStorage.getItem("vehicle");
-}
+      let tasks = [];
+      snap.forEach(child=>{
+        let t = child.val() || {};
+        t.id = child.key;
+        tasks.push(t);
+      });
 
-function driver(){
-return localStorage.getItem("driver");
-}
+      tasks.sort((a,b)=>(a.position||0)-(b.position||0));
 
-function logEvent(event){
+      tasks.forEach((t, idx)=>{
+        const row=document.createElement("div");
+        row.className="task";
 
-db.ref("shiftEvents").push({
-vehicle:vehicle(),
-driver:driver(),
-event:event,
-time:Date.now()
-});
+        const pri = t.priority ? "⚠ PRIORITY<br>" : "";
+        const who = (t.status==="accepted") ? `<br>Accepted: ${t.acceptedBy || ""} (${t.driver || ""})` : "";
+        const loc = (t.type==="Move Trailer")
+          ? `${t.from || ""} → ${t.to || ""}<br>${(t.loadType || "").toUpperCase()}`
+          : `Bay ${t.bay || ""}`;
 
-}
+        row.innerHTML = `
+          <b>${idx+1}. ${t.trailer || ""}</b><br>
+          ${pri}
+          ${t.type || ""}<br>
+          ${loc}<br>
+          Status: ${t.status || ""}
+          ${who}
+        `;
 
-function endShift(){
+        div.appendChild(row);
+      });
+    });
+  }
 
-logEvent("end shift");
-
-db.ref("shunters/"+vehicle()).remove();
-db.ref("powerConnections/"+vehicle()).remove();
-
-localStorage.clear();
-
-window.location.href="shunter-login.html";
-
-}
-
-function setBreak(){
-
-db.ref("shunters/"+vehicle()).update({
-status:"break",
-breakStart:Date.now()
-});
-
-logEvent("break");
-
-document.getElementById("screen").innerHTML="<h2>ON BREAK</h2>";
-
-}
-
-function backFromBreak(){
-
-db.ref("shunters/"+vehicle()).update({
-status:"available",
-breakStart:null
-});
-
-logEvent("back");
-
-}
-
-function acceptTask(id){
-
-db.ref("tasks/"+id).update({
-status:"accepted",
-acceptedBy:vehicle(),
-driver:driver(),
-acceptedTime:Date.now()
-});
-
-db.ref("shunters/"+vehicle()).update({
-status:"busy"
-});
-
-}
-
-function completeTask(id){
-
-db.ref("tasks/"+id).update({
-status:"completed",
-completedTime:Date.now()
-});
-
-db.ref("shunters/"+vehicle()).update({
-status:"available"
-});
-
-}
-
-function loadTasks(){
-
-db.ref("tasks").on("value",snapshot=>{
-
-const v=vehicle();
-
-const div=document.getElementById("screen");
-
-let tasks=[];
-
-snapshot.forEach(child=>{
-let t=child.val();
-t.id=child.key;
-tasks.push(t);
-});
-
-tasks=tasks.filter(t=>t.status!=="completed");
-
-tasks.sort((a,b)=>a.position-b.position);
-
-let myTask=tasks.find(t=>t.acceptedBy===v && t.status==="accepted");
-
-if(myTask){
-
-div.innerHTML=`
-<h2>${myTask.trailer}</h2>
-<p>${myTask.type}</p>
-
-<button onclick="completeTask('${myTask.id}')"
-style="width:90%;height:80px;font-size:28px">
-COMPLETE
-</button>
-`;
-
-return;
-
-}
-
-let nextTask=tasks.find(t=>t.status==="waiting");
-
-if(nextTask){
-
-div.innerHTML=`
-<h2>${nextTask.trailer}</h2>
-<p>${nextTask.type}</p>
-
-<button onclick="acceptTask('${nextTask.id}')"
-style="width:90%;height:80px;font-size:28px">
-ACCEPT
-</button>
-`;
-
-return;
-
-}
-
-div.innerHTML="No tasks waiting";
-
-});
-
-}
-
-window.onload=function(){
-
-document.getElementById("vehicleInfo").innerText=
-"Vehicle: "+vehicle()+" | Driver: "+driver();
-
-loadTasks();
-
-}
-
+  renderQueue();
 </script>
 
 </body>
