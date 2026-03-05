@@ -1,375 +1,253 @@
-/* NOTE:
-   - db is expected to be defined in config.js (firebase.initializeApp + const db = firebase.database())
-   - Do NOT redeclare db here
-*/
-
-/* ---------------------------
-HELPERS
---------------------------- */
-
-function _now() { return Date.now(); }
-
-function _safeText(v) {
-  return (v || "").toString().trim();
+function currentUser(){
+return {
+name: localStorage.getItem("userName") || "Unknown",
+role: localStorage.getItem("userRole") || "unknown"
+}
 }
 
-function _setMsg(id, text) {
-  const el = document.getElementById(id);
-  if (el) el.innerText = text || "";
-}
+/* ADD TASK */
 
-function _clearInputs(ids) {
-  ids.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = "";
-  });
-}
+function addTask(btn){
 
-function _disableButton(btn, text) {
-  if (!btn) return;
-  btn.disabled = true;
-  if (text) btn.innerText = text;
-}
+btn.disabled=true
+btn.innerText="Submitting..."
 
-function _enableButton(btn, text) {
-  if (!btn) return;
-  btn.disabled = false;
-  if (text) btn.innerText = text;
-}
+let user=currentUser()
 
-/* ---------------------------
-ADD TASK (Supervisor/Manager)
-- Supports:
-  - Move Trailer (free text from/to + loadType)
-  - Provide Power (DD) (bay dropdown)
-  - Priority checkbox: inserts behind accepted tasks, ahead of other waiting tasks
-- Button locks for 5s with feedback
---------------------------- */
+let type=document.getElementById("taskType").value
 
-function addTask(btn) {
+let trailer=""
+let from=""
+let to=""
+let bay=""
+let loadType=document.getElementById("loadType")?.value || ""
+let priority=document.getElementById("priority")?.checked || false
 
-  // button feedback
-  _disableButton(btn, "Submitting...");
+if(type==="move"){
 
-  const type = _safeText(document.getElementById("taskType")?.value);
+trailer=document.getElementById("trailer").value
+from=document.getElementById("from").value
+to=document.getElementById("to").value
 
-  // common
-  const priority = !!document.getElementById("priority")?.checked;
+}else{
 
-  // move fields
-  const trailerMove = _safeText(document.getElementById("trailer")?.value);
-  const from = _safeText(document.getElementById("from")?.value);
-  const to = _safeText(document.getElementById("to")?.value);
-  const loadType = _safeText(document.getElementById("loadType")?.value); // "Full Load" | "Empty Trailer" | "Trunk Trailer"
-
-  // power fields
-  const trailerPower = _safeText(document.getElementById("powerTrailer")?.value);
-  const bay = _safeText(document.getElementById("bay")?.value);
-
-  let task = {
-    status: "waiting",
-    created: _now(),
-    priority: priority
-  };
-
-  if (type === "move") {
-
-    if (!trailerMove || !from || !to) {
-      alert("Enter Trailer, From, and To");
-      _enableButton(btn, "Submit Task");
-      return;
-    }
-
-    task.type = "Move Trailer";
-    task.trailer = trailerMove;
-    task.from = from;
-    task.to = to;
-    task.loadType = loadType || "Trunk Trailer"; // default
-
-  } else {
-
-    if (!trailerPower || !bay) {
-      alert("Enter Trailer and select Bay");
-      _enableButton(btn, "Submit Task");
-      return;
-    }
-
-    task.type = "Provide Power (DD)";
-    task.trailer = trailerPower;
-    task.bay = bay;
-
-  }
-
-  // Insert position logic:
-  // - Always behind accepted tasks
-  // - If priority: insert immediately after accepted block, shifting waiting tasks down
-  // - If not priority: append to end
-
-  db.ref("tasks").once("value").then(snap => {
-
-    let tasks = [];
-    snap.forEach(child => {
-      let t = child.val() || {};
-      t.id = child.key;
-      tasks.push(t);
-    });
-
-    tasks.sort((a, b) => (a.position || 0) - (b.position || 0));
-
-    // find last accepted position (accepted = status "accepted")
-    let lastAcceptedPos = 0;
-    tasks.forEach(t => {
-      if (t.status === "accepted" && (t.position || 0) > lastAcceptedPos) {
-        lastAcceptedPos = t.position || 0;
-      }
-    });
-
-    if (!tasks.length) {
-      task.position = 1;
-      return db.ref("tasks").push(task);
-    }
-
-    if (!priority) {
-      // append
-      const maxPos = Math.max(...tasks.map(t => t.position || 0));
-      task.position = maxPos + 1;
-      return db.ref("tasks").push(task);
-    }
-
-    // priority insert: position = lastAcceptedPos + 1
-    const insertPos = lastAcceptedPos + 1;
-    task.position = insertPos;
-
-    // shift every task with position >= insertPos down by +1,
-    // BUT do NOT shift accepted tasks (they're <= lastAcceptedPos by definition).
-    // Still safe to shift all >= insertPos regardless of status; accepted should not be >= insertPos.
-    const updates = {};
-    tasks.forEach(t => {
-      const p = t.position || 0;
-      if (p >= insertPos) {
-        updates[`tasks/${t.id}/position`] = p + 1;
-      }
-    });
-
-    // apply shifts then push new task
-    return db.ref().update(updates).then(() => db.ref("tasks").push(task));
-
-  }).then(() => {
-
-    _setMsg("msg", "Task Added ✓");
-
-    // clear fields for faster entry
-    _clearInputs(["trailer", "from", "to", "powerTrailer"]);
-    // leave bay + dropdowns alone
-
-    if (btn) btn.innerText = "Task Added ✓";
-
-    setTimeout(() => {
-      _setMsg("msg", "");
-      _enableButton(btn, "Submit Task");
-    }, 5000);
-
-  }).catch(err => {
-
-    console.error(err);
-    alert("Failed to add task");
-    _enableButton(btn, "Submit Task");
-
-  });
+trailer=document.getElementById("powerTrailer").value
+bay=document.getElementById("bay").value
 
 }
 
-/* ---------------------------
-QUEUE MOVEMENT (Manager)
-Rules:
-- First 4 tasks (index 0-3) locked
-- Accepted tasks cannot be moved
-- We only swap with adjacent task if BOTH are movable waiting tasks
---------------------------- */
+if(!trailer){
 
-function moveUp(taskId) {
-  _swapWithNeighbor(taskId, -1);
-}
-
-function moveDown(taskId) {
-  _swapWithNeighbor(taskId, +1);
-}
-
-function _swapWithNeighbor(taskId, delta) {
-
-  db.ref("tasks").once("value").then(snap => {
-
-    let tasks = [];
-    snap.forEach(child => {
-      let t = child.val() || {};
-      t.id = child.key;
-      tasks.push(t);
-    });
-
-    tasks.sort((a, b) => (a.position || 0) - (b.position || 0));
-
-    const idx = tasks.findIndex(t => t.id === taskId);
-    if (idx === -1) return;
-
-    const neighborIdx = idx + delta;
-    if (neighborIdx < 0 || neighborIdx >= tasks.length) return;
-
-    // lock first 4 tasks
-    if (idx < 4 || neighborIdx < 4) return;
-
-    const a = tasks[idx];
-    const b = tasks[neighborIdx];
-
-    // never move accepted
-    if (a.status !== "waiting") return;
-    if (b.status !== "waiting") return;
-
-    const posA = a.position || 0;
-    const posB = b.position || 0;
-
-    const updates = {};
-    updates[`tasks/${a.id}/position`] = posB;
-    updates[`tasks/${b.id}/position`] = posA;
-
-    return db.ref().update(updates);
-
-  }).catch(console.error);
+alert("Enter trailer number")
+btn.disabled=false
+btn.innerText="Submit Task"
+return
 
 }
 
-/* ---------------------------
-DELETE TASK (Manager)
-Only delete WAITING tasks (not accepted/completed)
---------------------------- */
+db.ref("tasks").once("value",snap=>{
 
-function deleteTask(taskId) {
+let tasks=[]
+snap.forEach(child=>{
+let t=child.val()
+t.id=child.key
+tasks.push(t)
+})
 
-  if (!confirm("Delete task?")) return;
+tasks.sort((a,b)=>a.position-b.position)
 
-  db.ref("tasks/" + taskId).once("value").then(snap => {
-    const t = snap.val();
-    if (!t) return;
+let lastAccepted=0
 
-    if (t.status !== "waiting") {
-      alert("Cannot delete a task that has been accepted or completed.");
-      return;
-    }
+tasks.forEach(t=>{
+if(t.status==="accepted"){
+lastAccepted=Math.max(lastAccepted,t.position)
+}
+})
 
-    return db.ref("tasks/" + taskId).remove();
-  }).catch(console.error);
+let newPosition
+
+if(priority){
+
+newPosition=lastAccepted+1
+
+tasks.forEach(t=>{
+if(t.position>=newPosition){
+db.ref("tasks/"+t.id+"/position").set(t.position+1)
+}
+})
+
+}else{
+
+let max=0
+tasks.forEach(t=>{
+max=Math.max(max,t.position)
+})
+
+newPosition=max+1
 
 }
 
-/* ---------------------------
-SAFE ACCEPT TASK (Shunter)
-Transaction prevents double-accept
---------------------------- */
+db.ref("tasks").push({
 
-function acceptTask(taskId) {
+type:type==="move"?"Move Trailer":"Provide Power (DD)",
+trailer:trailer,
+from:from,
+to:to,
+bay:bay,
+loadType:loadType,
+priority:priority,
+requestedBy:user.name,
+requestedRole:user.role,
+status:"waiting",
+created:Date.now(),
+position:newPosition
 
-  const vehicle = localStorage.getItem("vehicle");
-  const driver = localStorage.getItem("driver");
+})
 
-  if (!vehicle || !driver) {
-    alert("Not logged in");
-    return;
-  }
+btn.innerText="Task Added ✓"
 
-  const taskRef = db.ref("tasks/" + taskId);
+setTimeout(()=>{
 
-  taskRef.transaction(task => {
+btn.disabled=false
+btn.innerText="Submit Task"
 
-    if (task === null) return task;
+},5000)
 
-    if (task.status !== "waiting") {
-      return; // abort
-    }
-
-    task.status = "accepted";
-    task.acceptedBy = vehicle;
-    task.driver = driver;
-    task.acceptedTime = _now();
-
-    return task;
-
-  }, (error, committed) => {
-
-    if (error) {
-      console.error(error);
-      alert("Accept failed");
-      return;
-    }
-
-    if (!committed) {
-      alert("Task already taken");
-      return;
-    }
-
-    // shunter status busy
-    db.ref("shunters/" + vehicle).update({ status: "busy" });
-
-  });
+})
 
 }
 
-/* ---------------------------
-COMPLETE TASK (Shunter)
-- Marks completed
-- If Provide Power: creates/updates powerConnections as connected when accepted elsewhere (your power flow may already handle)
---------------------------- */
 
-function completeTask(taskId) {
+/* MOVE QUEUE */
 
-  const vehicle = localStorage.getItem("vehicle");
-  if (!vehicle) return;
+function moveUp(id){
 
-  db.ref("tasks/" + taskId).update({
-    status: "completed",
-    completedTime: _now()
-  }).then(() => {
-    db.ref("shunters/" + vehicle).update({ status: "available" });
-  }).catch(console.error);
+db.ref("tasks").once("value",snap=>{
 
-}
+let tasks=[]
 
-/* ---------------------------
-GATEHOUSE NOTIFY (Shunter)
-Only meaningful for PRIORITY move tasks.
-Stores notification fields on task.
---------------------------- */
+snap.forEach(child=>{
+let t=child.val()
+t.id=child.key
+tasks.push(t)
+})
 
-function notifyGatehouseCleared(taskId, clearedLocation) {
+tasks.sort((a,b)=>a.position-b.position)
 
-  const vehicle = localStorage.getItem("vehicle") || "";
-  const driver = localStorage.getItem("driver") || "";
+let index=tasks.findIndex(t=>t.id===id)
 
-  db.ref("tasks/" + taskId).update({
-    gatehouseNotified: true,
-    gatehouseNotifiedTime: _now(),
-    gatehouseNotifiedBy: vehicle,
-    gatehouseNotifiedDriver: driver,
-    gatehouseClearedLocation: clearedLocation || ""
-  }).catch(console.error);
+if(index<=3) return
+
+let above=tasks[index-1]
+
+if(tasks[index].status!=="waiting") return
+if(above.status!=="waiting") return
+
+db.ref("tasks/"+id+"/position").set(above.position)
+db.ref("tasks/"+above.id+"/position").set(tasks[index].position)
+
+})
 
 }
 
-/* ---------------------------
-FINISH POWER (Manager/Supervisor)
---------------------------- */
+function moveDown(id){
 
-function finishPower(vehicle, btn) {
+db.ref("tasks").once("value",snap=>{
 
-  _disableButton(btn, "Finishing...");
+let tasks=[]
 
-  db.ref("powerConnections/" + vehicle).update({
-    status: "readyToDisconnect"
-  }).then(() => {
-    if (btn) btn.innerText = "Finished";
-    setTimeout(() => _enableButton(btn, "Finish Power"), 5000);
-  }).catch(err => {
-    console.error(err);
-    alert("Finish power failed");
-    _enableButton(btn, "Finish Power");
-  });
+snap.forEach(child=>{
+let t=child.val()
+t.id=child.key
+tasks.push(t)
+})
+
+tasks.sort((a,b)=>a.position-b.position)
+
+let index=tasks.findIndex(t=>t.id===id)
+
+if(index<4) return
+if(index===tasks.length-1) return
+
+let below=tasks[index+1]
+
+if(tasks[index].status!=="waiting") return
+if(below.status!=="waiting") return
+
+db.ref("tasks/"+id+"/position").set(below.position)
+db.ref("tasks/"+below.id+"/position").set(tasks[index].position)
+
+})
+
+}
+
+
+/* DELETE TASK */
+
+function deleteTask(id){
+
+if(!confirm("Delete task?")) return
+
+db.ref("tasks/"+id).remove()
+
+}
+
+
+/* ACCEPT TASK */
+
+function acceptTask(id){
+
+let vehicle=localStorage.getItem("vehicle")
+let driver=localStorage.getItem("driver")
+
+db.ref("tasks/"+id).transaction(task=>{
+
+if(task===null) return task
+if(task.status!=="waiting") return
+
+task.status="accepted"
+task.acceptedBy=vehicle
+task.driver=driver
+task.acceptedTime=Date.now()
+
+return task
+
+})
+
+}
+
+
+/* COMPLETE TASK */
+
+function completeTask(id){
+
+let vehicle=localStorage.getItem("vehicle")
+
+db.ref("tasks/"+id).update({
+
+status:"completed",
+completedTime:Date.now()
+
+})
+
+db.ref("shunters/"+vehicle).update({
+
+status:"available"
+
+})
+
+}
+
+
+/* GATEHOUSE NOTIFY */
+
+function notifyGatehouse(id){
+
+db.ref("tasks/"+id).update({
+
+gatehouseNotified:true,
+gatehouseTime:Date.now()
+
+})
 
 }
