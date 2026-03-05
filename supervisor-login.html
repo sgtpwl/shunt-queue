@@ -1,1 +1,43 @@
 
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>Supervisor Login</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+</head>
+
+<body>
+
+<h1>Supervisor Login</h1>
+
+<input id="name" placeholder="Enter your name">
+
+<br><br>
+
+<button onclick="login()">Login</button>
+
+<script>
+
+function login(){
+
+let name=document.getElementById("name").value
+
+if(!name){
+alert("Enter your name")
+return
+}
+
+localStorage.setItem("userName",name)
+localStorage.setItem("userRole","Supervisor")
+
+window.location.href="supervisor.html"
+
+}
+
+</script>
+
+</body>
+</html>
