@@ -19,6 +19,14 @@
 <div id="yardStatus"></div>
 
 <h2>Completed Tasks</h2>
+
+<select id="dateFilter" onchange="renderCompleted()">
+<option value="today">Today</option>
+<option value="7">Last 7 Days</option>
+<option value="30">Last 30 Days</option>
+<option value="all">All Time</option>
+</select>
+
 <div id="completedTasks"></div>
 
 <button onclick="downloadCSV()">Download CSV Report</button>
@@ -111,13 +119,46 @@ div.appendChild(row);
 
 }
 
+function getDateLimit(){
+
+const filter=document.getElementById("dateFilter").value;
+
+const now=Date.now();
+
+if(filter==="today"){
+
+let start=new Date();
+start.setHours(0,0,0,0);
+return start.getTime();
+
+}
+
+if(filter==="7"){
+
+return now-(7*24*60*60*1000);
+
+}
+
+if(filter==="30"){
+
+return now-(30*24*60*60*1000);
+
+}
+
+return 0;
+
+}
+
 function renderCompleted(){
 
 const div=document.getElementById("completedTasks");
 div.innerHTML="";
 
+const limit=getDateLimit();
+
 tasksData
 .filter(t=>t.status==="completed")
+.filter(t=>t.completedTime>=limit)
 .sort((a,b)=>b.completedTime-a.completedTime)
 .forEach(t=>{
 
@@ -145,8 +186,11 @@ function downloadCSV(){
 
 let csv="Trailer,Vehicle,Driver,Delay,Duration\n";
 
+const limit=getDateLimit();
+
 tasksData
 .filter(t=>t.status==="completed")
+.filter(t=>t.completedTime>=limit)
 .forEach(t=>{
 
 let delay=minutes(t.acceptedTime-t.created);
@@ -169,9 +213,7 @@ a.click();
 function resetShunters(){
 
 if(confirm("Reset all shunters?")){
-
 db.ref("shunters").remove();
-
 }
 
 }
@@ -179,9 +221,7 @@ db.ref("shunters").remove();
 function clearPower(){
 
 if(confirm("Clear all power connections?")){
-
 db.ref("powerConnections").remove();
-
 }
 
 }
