@@ -1,84 +1,96 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Select Vehicle</title>
-<link rel="stylesheet" href="style.css">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shunter Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
-<h1>Select Vehicle</h1>
+<h1>Shunter Login</h1>
 
-<input id="driverName" placeholder="Driver Name">
+<label>Vehicle</label><br>
+<select id="vehicle">
+  <option value="">Select vehicle</option>
+  <option value="S1">S1</option>
+  <option value="S2">S2</option>
+  <option value="S3">S3</option>
+  <option value="S4">S4</option>
+</select>
 
-<div id="vehicles"></div>
+<br><br>
+
+<label>Driver name</label><br>
+<input id="driver" placeholder="e.g. Dave">
+
+<br><br>
+
+<button id="loginBtn" onclick="login()">Login</button>
+
+<p id="msg"></p>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script src="config.js"></script>
 
 <script>
+function login(){
 
-const vehicles=["S1","S2","S3","S4","SPARE"];
+  const btn = document.getElementById("loginBtn");
+  btn.disabled = true;
+  btn.innerText = "Logging in...";
 
-const container=document.getElementById("vehicles");
+  const vehicle = (document.getElementById("vehicle").value || "").trim();
+  const driver = (document.getElementById("driver").value || "").trim();
 
-vehicles.forEach(v=>{
+  if(!vehicle || !driver){
+    alert("Select a vehicle and enter driver name");
+    btn.disabled = false;
+    btn.innerText = "Login";
+    return;
+  }
 
-const btn=document.createElement("button");
+  // Lock vehicle so only one login per vehicle at a time
+  const ref = db.ref("shunters/" + vehicle);
 
-btn.innerText=v;
+  ref.transaction(current => {
 
-btn.style.width="90%";
-btn.style.height="80px";
-btn.style.fontSize="28px";
-btn.style.margin="10px";
+    // if someone already logged in and hasn't been cleared, block
+    if(current && current.isLoggedIn){
+      return; // abort
+    }
 
-btn.onclick=()=>loginVehicle(v);
+    return {
+      driver: driver,
+      status: "available",
+      isLoggedIn: true,
+      loginTime: Date.now()
+    };
 
-container.appendChild(btn);
+  }, (error, committed) => {
 
-});
+    if(error){
+      console.error(error);
+      alert("Login failed");
+      btn.disabled = false;
+      btn.innerText = "Login";
+      return;
+    }
 
-function loginVehicle(vehicle){
+    if(!committed){
+      alert(vehicle + " is already logged in on another device.");
+      btn.disabled = false;
+      btn.innerText = "Login";
+      return;
+    }
 
-const driver=document.getElementById("driverName").value.trim();
+    localStorage.setItem("vehicle", vehicle);
+    localStorage.setItem("driver", driver);
 
-if(driver.length<2){
-alert("Enter driver name");
-return;
-}
-
-db.ref("shunters/"+vehicle).once("value",snap=>{
-
-if(snap.exists()){
-alert(vehicle+" already in use");
-return;
-}
-
-db.ref("shunters/"+vehicle).set({
-status:"available",
-driver:driver,
-loginTime:Date.now()
-});
-
-db.ref("shiftEvents").push({
-vehicle:vehicle,
-driver:driver,
-event:"login",
-time:Date.now()
-});
-
-localStorage.setItem("vehicle",vehicle);
-localStorage.setItem("driver",driver);
-
-window.location.href="shunter.html";
-
-});
+    window.location.href = "shunter.html";
+  });
 
 }
-
 </script>
 
 </body>
