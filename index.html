@@ -2,36 +2,41 @@
 <html>
 <head>
 
-<title>Shunt Queue</title>
+<title>Manager Login</title>
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="style.css">
 
 </head>
 
 <body>
 
-<h1>Shunt Queue System</h1>
+<h1>Manager Login</h1>
 
-<h2>Login</h2>
-
-<br>
-
-<button onclick="location.href='supervisor-login.html'">
-Supervisor Login
-</button>
+<input id="name" placeholder="Enter your name">
 
 <br><br>
 
-<button onclick="location.href='manager-login.html'">
-Manager Login
-</button>
+<button onclick="login()">Login</button>
 
-<br><br>
+<script>
 
-<button onclick="location.href='shunter-login.html'">
-Shunter Login
-</button>
+function login(){
+
+let name=document.getElementById("name").value
+
+if(!name){
+alert("Enter your name")
+return
+}
+
+localStorage.setItem("userName",name)
+localStorage.setItem("userRole","Manager")
+
+window.location.href="manager.html"
+
+}
+
+</script>
 
 </body>
 </html>
