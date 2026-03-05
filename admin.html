@@ -1,356 +1,192 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
 <title>Admin Dashboard</title>
-
-<style>
-
-body{
-font-family: Arial, sans-serif;
-margin:40px;
-background:#f4f6f8;
-}
-
-h1{
-margin-bottom:20px;
-}
-
-button{
-background:#2d6cdf;
-color:white;
-border:none;
-padding:10px 18px;
-font-size:15px;
-border-radius:4px;
-cursor:pointer;
-margin:5px;
-}
-
-button:hover{
-background:#1f4fb3;
-}
-
-.section{
-margin-top:35px;
-}
-
-.vehicle{
-background:white;
-padding:14px;
-margin-bottom:10px;
-border-radius:6px;
-box-shadow:0 1px 3px rgba(0,0,0,0.1);
-font-size:16px;
-}
-
-.alert{
-background:#ffe6e6;
-border-left:6px solid red;
-padding:12px;
-margin-bottom:10px;
-border-radius:4px;
-font-weight:bold;
-}
-
-.adminPanel{
-background:white;
-padding:20px;
-border-radius:6px;
-box-shadow:0 1px 3px rgba(0,0,0,0.1);
-}
-
-</style>
+<link rel="stylesheet" href="style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 
 <body>
 
 <h1>Admin Dashboard</h1>
 
-<button onclick="downloadCSV()">Download CSV Report</button>
-
-<div class="section">
-<h2>Live Yard Status</h2>
-<div id="yardStatus"></div>
-</div>
-
-<div class="section">
 <h2>Alerts</h2>
 <div id="alerts"></div>
-</div>
 
-<div class="section">
-<h2>Admin Control Panel</h2>
+<h2>Live Yard Status</h2>
+<div id="yardStatus"></div>
 
-<div class="adminPanel">
+<h2>System Stats</h2>
+<div id="systemStats"></div>
 
-<button onclick="resetShunters()">Reset All Shunters</button>
-<button onclick="clearPower()">Clear Power Connections</button>
-<button onclick="clearStuckJobs()">Clear Stuck Jobs</button>
-<button onclick="clearEvents()">Clear Shift Events</button>
-<button onclick="generateTestJobs()">Generate Test Jobs</button>
+<h2>Shunter Performance</h2>
+<div id="shunterStats"></div>
 
-</div>
+<h2>Completed Tasks</h2>
+<div id="completedTasks"></div>
 
-</div>
+<button onclick="downloadCSV()">Download CSV</button>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="config.js"></script>
 
 <script>
 
-const firebaseConfig = {
-apiKey: "AIzaSyACwPAzBK_TFOyIuuI0iNzy_9zW-CKA7m4",
-authDomain: "shunt-queue.firebaseapp.com",
-databaseURL: "https://shunt-queue-default-rtdb.europe-west1.firebasedatabase.app",
-projectId: "shunt-queue",
-storageBucket: "shunt-queue.appspot.com",
-messagingSenderId: "773776993625",
-appId: "1:773776993625:web:2082ee7a38be041bee7048"
-};
+let tasksData=[];
+let powerData={};
+let shuntersData={};
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+function minutes(ms){
 
-
-/* LIVE YARD STATUS */
-
-function loadYardStatus(){
-
-const container = document.getElementById("yardStatus");
-
-db.ref("shunters").on("value", snapshot => {
-
-container.innerHTML="";
-
-snapshot.forEach(child=>{
-
-const v = child.val();
-const vehicle = child.key;
-
-const div = document.createElement("div");
-div.className="vehicle";
-
-if(v.onBreak){
-
-div.innerText = vehicle+" — On Break";
-container.appendChild(div);
+return Math.floor(ms/60000);
 
 }
 
-else if(v.currentTask){
+function loadAll(){
 
-const span=document.createElement("span");
-span.id="timer_"+vehicle;
+db.ref("tasks").on("value",snap=>{
 
-div.innerHTML = vehicle+" — Working task "+v.currentTask+" (";
-div.appendChild(span);
-div.innerHTML+=")";
-
-container.appendChild(div);
-
-startTimer(vehicle,v.currentTask);
-
-}
-
-else{
-
-div.innerText = vehicle+" — Available";
-container.appendChild(div);
-
-}
-
-});
-
-});
-
-}
-
-
-/* TASK TIMER */
-
-function startTimer(vehicle,taskId){
-
-db.ref("tasks/"+taskId).once("value",snap=>{
-
-const t=snap.val();
-if(!t || !t.startedAt) return;
-
-const start=t.startedAt;
-
-setInterval(()=>{
-
-const elapsed=Math.floor((Date.now()-start)/1000);
-const mins=Math.floor(elapsed/60);
-const secs=elapsed%60;
-
-const display=
-String(mins).padStart(2,"0")+":"+
-String(secs).padStart(2,"0");
-
-const el=document.getElementById("timer_"+vehicle);
-
-if(el) el.innerText=display;
-
-},1000);
-
-});
-
-}
-
-
-/* ALERTS */
-
-function checkAlerts(){
-
-const box=document.getElementById("alerts");
-box.innerHTML="";
-
-db.ref("tasks").once("value",snap=>{
+tasksData=[];
 
 snap.forEach(child=>{
 
-const t=child.val();
-
-if(t.status==="active" && t.startedAt){
-
-const mins=(Date.now()-t.startedAt)/60000;
-
-if(mins>15){
-
-const div=document.createElement("div");
-div.className="alert";
-div.innerText="🚨 Task "+child.key+" running "+Math.round(mins)+" minutes";
-
-box.appendChild(div);
-
-}
-
-}
+let t=child.val();
+t.id=child.key;
+tasksData.push(t);
 
 });
 
+renderStats();
+renderCompleted();
+renderYard();
+
 });
 
-}
+db.ref("powerConnections").on("value",snap=>{
 
-
-/* ADMIN TOOLS */
-
-function resetShunters(){
-
-if(!confirm("Reset all shunters?")) return;
-
-db.ref("shunters").set({
-S1:{},
-S2:{},
-S3:{},
-S4:{},
-SPARE:{}
-});
-
-}
-
-function clearPower(){
-
-if(!confirm("Clear power connections?")) return;
-
-db.ref("powerConnections").remove();
-
-}
-
-function clearStuckJobs(){
-
-db.ref("tasks").once("value",snap=>{
+powerData={};
 
 snap.forEach(child=>{
 
-const t=child.val();
-
-if(t.status==="active" && t.startedAt){
-
-const mins=(Date.now()-t.startedAt)/60000;
-
-if(mins>15){
-
-db.ref("tasks/"+child.key+"/status").set("pending");
-
-}
-
-}
+powerData[child.key]=child.val();
 
 });
 
+renderYard();
+
 });
 
-}
+db.ref("shunters").on("value",snap=>{
 
-function clearEvents(){
+shuntersData={};
 
-if(!confirm("Delete all shift events?")) return;
+snap.forEach(child=>{
 
-db.ref("shiftEvents").remove();
+shuntersData[child.key]=child.val();
 
-}
+});
 
-function generateTestJobs(){
-
-for(let i=1;i<=5;i++){
-
-const id=db.ref("tasks").push().key;
-
-db.ref("tasks/"+id).set({
-
-bay:"TEST-"+i,
-trailer:"SIM-"+Math.floor(Math.random()*999),
-status:"pending",
-createdAt:Date.now()
+renderYard();
 
 });
 
 }
 
+function renderYard(){
+
+const div=document.getElementById("yardStatus");
+div.innerHTML="";
+
+Object.keys(shuntersData).forEach(v=>{
+
+let s=shuntersData[v];
+
+let row=document.createElement("div");
+row.className="task";
+
+if(powerData[v] && powerData[v].status==="connected"){
+
+row.innerHTML=`${v} ⚡ Power Bay ${powerData[v].bay}`;
+
+}else if(s.status==="break"){
+
+row.innerHTML=`${v} Break`;
+
+}else{
+
+row.innerHTML=`${v} Available`;
+
 }
 
+div.appendChild(row);
 
-/* CSV */
+});
+
+}
+
+function renderCompleted(){
+
+const div=document.getElementById("completedTasks");
+div.innerHTML="";
+
+tasksData.filter(t=>t.status==="completed").forEach(t=>{
+
+let delay=minutes(t.acceptedTime-t.created);
+let dur=minutes(t.completedTime-t.acceptedTime);
+
+let row=document.createElement("div");
+row.className="task";
+
+row.innerHTML=`
+Trailer ${t.trailer}
+Vehicle ${t.acceptedBy}
+Driver ${t.driver}
+Delay ${delay} min
+Duration ${dur} min
+`;
+
+div.appendChild(row);
+
+});
+
+}
+
+function renderStats(){
+
+let total=0;
+
+tasksData.forEach(t=>{
+
+if(t.status==="completed") total++;
+
+});
+
+document.getElementById("systemStats").innerHTML=`Tasks Completed ${total}`;
+
+}
 
 function downloadCSV(){
 
-db.ref("shiftEvents").once("value",snap=>{
+let csv="Trailer,Vehicle,Driver\n";
 
-let csv="Time,Vehicle,Driver,Event,Details\n";
+tasksData.filter(t=>t.status==="completed").forEach(t=>{
 
-snap.forEach(child=>{
-
-const e=child.val();
-
-csv+=
-(e.time||"")+","+
-(e.vehicle||"")+","+
-(e.driver||"")+","+
-(e.event||"")+","+
-(e.details||"")+"\n";
+csv+=`${t.trailer},${t.acceptedBy},${t.driver}\n`;
 
 });
 
-const blob=new Blob([csv],{type:"text/csv"});
-const url=URL.createObjectURL(blob);
+let blob=new Blob([csv]);
+let url=URL.createObjectURL(blob);
 
-const a=document.createElement("a");
+let a=document.createElement("a");
 a.href=url;
-a.download="shift-report.csv";
+a.download="report.csv";
 a.click();
-
-});
 
 }
 
-
-loadYardStatus();
-checkAlerts();
-
-setInterval(checkAlerts,60000);
+loadAll();
 
 </script>
 
