@@ -36,96 +36,102 @@ const vehicle=localStorage.getItem("vehicle")
 const driver=localStorage.getItem("driver")
 
 if(!vehicle){
-
 window.location.href="shunter-login.html"
-
 }
 
 document.getElementById("vehicle").innerText=
 vehicle+" - "+driver
 
+let currentTask=null
+
 
 /* ---------- LOAD TASK ---------- */
 
-function loadTask(){
+function loadTasks(){
 
 db.ref("tasks").on("value",snap=>{
 
 let tasks=[]
 
 snap.forEach(child=>{
-
 let t=child.val()
 t.id=child.key
-
 tasks.push(t)
-
 })
 
 tasks=tasks.filter(t=>t.status!=="completed")
 
-tasks.sort((a,b)=>(a.position||0)-(b.position||0))
+tasks.sort((a,b)=>a.position-b.position)
 
 let mine=tasks.find(t=>t.status==="accepted" && t.acceptedBy===vehicle)
 
 let next=tasks.find(t=>t.status==="waiting")
 
-let task=mine||next
+currentTask=mine || next
+
+renderTask()
+
+})
+
+}
+
+loadTasks()
+
+
+/* ---------- RENDER TASK ---------- */
+
+function renderTask(){
 
 const div=document.getElementById("taskArea")
 
-if(!task){
+if(!currentTask){
 
 div.innerHTML="No tasks waiting"
 return
 
 }
 
-let priority=task.priority?"<div class='priority'>PRIORITY</div>":""
-
-let job=task.type
+let priority=currentTask.priority?"<div class='priority'>PRIORITY</div>":""
 
 let location=""
 
-if(job==="Move Trailer"){
+if(currentTask.type==="Move Trailer"){
 
-location=(task.from||"")+" → "+(task.to||"")
+location=(currentTask.from||"")+" → "+(currentTask.to||"")
 
 }else{
 
-location="Bay "+task.bay
+location="Bay "+currentTask.bay
 
 }
 
-let load=task.loadType||""
-
 let html=`
 
-<h2>${task.trailer}</h2>
+<h2>${currentTask.trailer}</h2>
 
-<div class="big">${job}</div>
+<div class="big">${currentTask.type}</div>
 
 <div class="big">${location}</div>
 
-<div class="big">${load}</div>
+<div class="big">${currentTask.loadType || ""}</div>
 
 ${priority}
 
 `
 
-if(task.status==="waiting"){
+if(currentTask.status==="waiting"){
 
-html+=`<button onclick="acceptTask('${task.id}')">ACCEPT</button>`
+html+=`<button onclick="acceptCurrent()">ACCEPT</button>`
 
 }
 
-if(task.status==="accepted" && task.acceptedBy===vehicle){
+if(currentTask.status==="accepted" && currentTask.acceptedBy===vehicle){
 
-html+=`<button onclick="completeTask('${task.id}')">COMPLETE</button>`
+html+=`<button onclick="completeCurrent()">COMPLETE</button>`
 
-if(task.priority && job==="Move Trailer"){
+if(currentTask.priority){
 
-html+=`<br><button onclick="notifyGatehouse('${task.id}')">Notify Gatehouse</button>`
+html+=`<br><button onclick="notifyGatehouse('${currentTask.id}')">Notify Gatehouse</button>`
 
 }
 
@@ -133,11 +139,29 @@ html+=`<br><button onclick="notifyGatehouse('${task.id}')">Notify Gatehouse</but
 
 div.innerHTML=html
 
-})
+}
+
+
+/* ---------- ACCEPT ---------- */
+
+function acceptCurrent(){
+
+if(!currentTask) return
+
+acceptTask(currentTask.id)
 
 }
 
-loadTask()
+
+/* ---------- COMPLETE ---------- */
+
+function completeCurrent(){
+
+if(!currentTask) return
+
+completeTask(currentTask.id)
+
+}
 
 
 /* ---------- BREAK BUTTON CONTROL ---------- */
