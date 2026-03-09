@@ -36,16 +36,28 @@
 
 <h2>Completed Jobs</h2>
 
+<div>
+
+<button onclick="setFilter('today')">Today</button>
+<button onclick="setFilter('24h')">24 Hours</button>
+<button onclick="setFilter('7d')">7 Days</button>
+<button onclick="setFilter('30d')">30 Days</button>
+
+</div>
+
+<br>
+
 <div class="queueHeader">
 
 <div>Trailer</div>
 <div>Job</div>
 <div>From</div>
-<div>To</div>
+<div>To/Bay</div>
 <div>Load</div>
 <div>Requested</div>
 <div>Accepted</div>
 <div>Completed</div>
+<div>Duration</div>
 
 </div>
 
@@ -58,6 +70,15 @@
 <script src="app.js"></script>
 
 <script>
+
+let filter="today"
+
+function setFilter(f){
+
+filter=f
+loadCompleted()
+
+}
 
 function resetVehicle(vehicle){
 
@@ -83,19 +104,36 @@ alert("Power connections cleared")
 
 }
 
-/* LOAD COMPLETED JOBS */
+function loadCompleted(){
 
-db.ref("tasks").on("value",snap=>{
+db.ref("tasks").once("value").then(snap=>{
 
 let div=document.getElementById("completed")
 
 div.innerHTML=""
+
+let now=Date.now()
 
 snap.forEach(child=>{
 
 let t=child.val()
 
 if(t.status!=="completed") return
+
+let age=now-(t.completedTime||0)
+
+if(filter==="today" && age>86400000) return
+if(filter==="24h" && age>86400000) return
+if(filter==="7d" && age>604800000) return
+if(filter==="30d" && age>2592000000) return
+
+let duration=""
+
+if(t.completedTime && t.acceptedTime){
+
+duration=Math.round((t.completedTime-t.acceptedTime)/1000)+"s"
+
+}
 
 let row=document.createElement("div")
 
@@ -111,6 +149,7 @@ row.innerHTML=`
 <div>${new Date(t.created).toLocaleTimeString()}</div>
 <div>${new Date(t.acceptedTime||0).toLocaleTimeString()}</div>
 <div>${new Date(t.completedTime||0).toLocaleTimeString()}</div>
+<div>${duration}</div>
 
 `
 
@@ -119,6 +158,10 @@ div.appendChild(row)
 })
 
 })
+
+}
+
+loadCompleted()
 
 </script>
 
