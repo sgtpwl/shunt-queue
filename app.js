@@ -36,15 +36,6 @@ bay=document.getElementById("bay").value
 
 }
 
-if(!trailer){
-
-alert("Enter trailer number")
-btn.disabled=false
-btn.innerText="Submit Task"
-return
-
-}
-
 db.ref("tasks").once("value",snap=>{
 
 let tasks=[]
@@ -111,12 +102,11 @@ setTimeout(()=>{
 btn.disabled=false
 btn.innerText="Submit Task"
 
-},5000)
+},3000)
 
 })
 
 }
-
 
 /* MOVE QUEUE */
 
@@ -181,7 +171,6 @@ db.ref("tasks/"+below.id+"/position").set(tasks[index].position)
 
 }
 
-
 /* DELETE TASK */
 
 function deleteTask(id){
@@ -191,7 +180,6 @@ if(!confirm("Delete task?")) return
 db.ref("tasks/"+id).remove()
 
 }
-
 
 /* ACCEPT TASK */
 
@@ -216,7 +204,6 @@ return task
 
 }
 
-
 /* COMPLETE TASK */
 
 function completeTask(id){
@@ -238,7 +225,6 @@ status:"available"
 
 }
 
-
 /* GATEHOUSE NOTIFY */
 
 function notifyGatehouse(id){
@@ -251,3 +237,52 @@ gatehouseTime:Date.now()
 })
 
 }
+
+/* FINISH POWER */
+
+function finishPower(vehicle){
+
+db.ref("powerConnections/"+vehicle).remove()
+
+}
+
+/* -------- SAFETY TIMER -------- */
+
+function safetyCheck(){
+
+const limit=15*60*1000
+
+db.ref("tasks").once("value",snap=>{
+
+snap.forEach(child=>{
+
+let t=child.val()
+
+if(t.status==="accepted"){
+
+let now=Date.now()
+
+if(now-t.acceptedTime>limit){
+
+db.ref("tasks/"+child.key).update({
+
+status:"waiting",
+acceptedBy:null,
+driver:null,
+acceptedTime:null
+
+})
+
+}
+
+}
+
+})
+
+})
+
+}
+
+/* RUN EVERY MINUTE */
+
+setInterval(safetyCheck,60000)
