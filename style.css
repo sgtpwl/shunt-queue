@@ -39,7 +39,7 @@ margin:4px;
 border-radius:4px;
 }
 
-/* ---------- MANAGER QUEUE HEADER ---------- */
+/* ---------- MANAGER HEADER ---------- */
 
 .queueHeader{
 
@@ -47,12 +47,12 @@ display:grid;
 
 grid-template-columns:
 50px
-120px
-120px
-90px
-90px
 100px
 130px
+90px
+90px
+110px
+160px
 100px
 100px
 80px;
@@ -65,20 +65,20 @@ padding-bottom:6px;
 
 }
 
-/* ---------- MANAGER TASK ROW ---------- */
+/* ---------- MANAGER ROW ---------- */
 
-.task{
+.managerRow{
 
 display:grid;
 
 grid-template-columns:
 50px
-120px
-120px
-90px
-90px
 100px
 130px
+90px
+90px
+110px
+160px
 100px
 100px
 80px;
@@ -99,7 +99,7 @@ border-radius:6px;
 
 }
 
-/* ---------- ADMIN RECORD HEADER ---------- */
+/* ---------- ADMIN HEADER ---------- */
 
 .adminHeader{
 
@@ -127,7 +127,7 @@ padding-bottom:6px;
 
 }
 
-/* ---------- ADMIN RECORD ROW ---------- */
+/* ---------- ADMIN ROW ---------- */
 
 .adminRow{
 
@@ -196,7 +196,7 @@ margin-top:20px;
 
 @media(max-width:700px){
 
-.task{
+.managerRow{
 grid-template-columns:1fr;
 }
 
