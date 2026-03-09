@@ -43,10 +43,8 @@ created:Date.now()
 button.innerText="Task Added ✓"
 
 setTimeout(()=>{
-
 button.disabled=false
 button.innerText="Submit Task"
-
 },3000)
 
 })
@@ -63,28 +61,37 @@ function acceptTask(id){
 let vehicle=localStorage.getItem("vehicle")
 let driver=localStorage.getItem("driver")
 
-db.ref("tasks/"+id).once("value",snap=>{
+const taskRef=db.ref("tasks/"+id)
 
-let task=snap.val()
+taskRef.transaction(task=>{
 
-if(!task) return
+if(task===null) return task
+
+/* another shunter already took it */
 
 if(task.status!=="waiting") return
 
-db.ref("tasks/"+id).update({
+task.status="accepted"
+task.acceptedBy=vehicle
+task.acceptedByDriver=driver
+task.acceptedTime=Date.now()
 
-status:"accepted",
-acceptedBy:vehicle,
-acceptedByDriver:driver,
-acceptedTime:Date.now()
+return task
 
 })
 
-db.ref("shunters/"+vehicle).update({
+.then(result=>{
 
+if(!result.committed){
+alert("Task already taken")
+return
+}
+
+/* update shunter status */
+
+db.ref("shunters/"+vehicle).update({
 status:"moving",
 driver:driver
-
 })
 
 })
@@ -98,6 +105,24 @@ function completeTask(id){
 
 let vehicle=localStorage.getItem("vehicle")
 
+db.ref("tasks/"+id).once("value",snap=>{
+
+let task=snap.val()
+
+if(!task) return
+
+/* 30 second protection */
+
+let elapsed=(Date.now()-(task.acceptedTime||0))/1000
+
+if(elapsed<30){
+
+alert("Task must run at least 30 seconds before completion")
+
+return
+
+}
+
 db.ref("tasks/"+id).update({
 
 status:"completed",
@@ -108,6 +133,8 @@ completedTime:Date.now()
 db.ref("shunters/"+vehicle).update({
 
 status:"available"
+
+})
 
 })
 
@@ -215,4 +242,3 @@ db.ref("shunters/"+child.key+"/status").set("offline")
 })
 
 },30000)
-
