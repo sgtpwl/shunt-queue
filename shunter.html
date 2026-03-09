@@ -32,24 +32,20 @@ Loading...
 
 <script>
 
-const vehicle=localStorage.getItem("vehicle")
-const driver=localStorage.getItem("driver")
+const vehicle = localStorage.getItem("vehicle")
+const driver = localStorage.getItem("driver")
 
 if(!vehicle){
 window.location.href="shunter-login.html"
 }
 
-document.getElementById("vehicle").innerText=
-vehicle+" - "+driver
-
-let currentTask=null
+document.getElementById("vehicle").innerText =
+vehicle + " - " + driver
 
 
-/* ---------- LOAD TASK ---------- */
+/* LOAD TASKS */
 
-function loadTasks(){
-
-db.ref("tasks").on("value",snap=>{
+db.ref("tasks").on("value", snap => {
 
 let tasks=[]
 
@@ -59,116 +55,70 @@ t.id=child.key
 tasks.push(t)
 })
 
-tasks=tasks.filter(t=>t.status!=="completed")
+tasks = tasks.filter(t=>t.status!=="completed")
 
-tasks.sort((a,b)=>a.position-b.position)
+tasks.sort((a,b)=>(a.position||0)-(b.position||0))
 
-let mine=tasks.find(t=>t.status==="accepted" && t.acceptedBy===vehicle)
+let mine = tasks.find(t=>t.status==="accepted" && t.acceptedBy===vehicle)
+let next = tasks.find(t=>t.status==="waiting")
 
-let next=tasks.find(t=>t.status==="waiting")
-
-currentTask=mine || next
-
-renderTask()
-
-})
-
-}
-
-loadTasks()
-
-
-/* ---------- RENDER TASK ---------- */
-
-function renderTask(){
+let task = mine || next
 
 const div=document.getElementById("taskArea")
 
-if(!currentTask){
-
+if(!task){
 div.innerHTML="No tasks waiting"
 return
-
 }
-
-let priority=currentTask.priority?"<div class='priority'>PRIORITY</div>":""
 
 let location=""
 
-if(currentTask.type==="Move Trailer"){
-
-location=(currentTask.from||"")+" → "+(currentTask.to||"")
-
+if(task.type==="Move Trailer"){
+location=(task.from||"")+" → "+(task.to||"")
 }else{
-
-location="Bay "+currentTask.bay
-
+location="Bay "+task.bay
 }
 
-let html=`
+let html = `
 
-<h2>${currentTask.trailer}</h2>
+<h2>${task.trailer}</h2>
 
-<div class="big">${currentTask.type}</div>
+<div class="big">${task.type}</div>
 
 <div class="big">${location}</div>
 
-<div class="big">${currentTask.loadType || ""}</div>
-
-${priority}
+<div class="big">${task.loadType || ""}</div>
 
 `
 
-if(currentTask.status==="waiting"){
-
-html+=`<button onclick="acceptCurrent()">ACCEPT</button>`
-
+if(task.priority){
+html+=`<div class="priority">PRIORITY</div>`
 }
 
-if(currentTask.status==="accepted" && currentTask.acceptedBy===vehicle){
+if(task.status==="waiting"){
+html+=`<button onclick="acceptTask('${task.id}')">ACCEPT</button>`
+}
 
-html+=`<button onclick="completeCurrent()">COMPLETE</button>`
+if(task.status==="accepted" && task.acceptedBy===vehicle){
 
-if(currentTask.priority){
+html+=`<button onclick="completeTask('${task.id}')">COMPLETE</button>`
 
-html+=`<br><button onclick="notifyGatehouse('${currentTask.id}')">Notify Gatehouse</button>`
-
+if(task.priority){
+html+=`<br><button onclick="notifyGatehouse('${task.id}')">Notify Gatehouse</button>`
 }
 
 }
 
 div.innerHTML=html
 
-}
+})
 
 
-/* ---------- ACCEPT ---------- */
-
-function acceptCurrent(){
-
-if(!currentTask) return
-
-acceptTask(currentTask.id)
-
-}
-
-
-/* ---------- COMPLETE ---------- */
-
-function completeCurrent(){
-
-if(!currentTask) return
-
-completeTask(currentTask.id)
-
-}
-
-
-/* ---------- BREAK BUTTON CONTROL ---------- */
+/* BREAK BUTTON CONTROL */
 
 function updateBreakButtons(){
 
-db.ref("shunters/"+vehicle).on("value",snap=>{
+db.ref("shunters/"+vehicle).on("value", snap=>{
 
 let s=snap.val()
 
@@ -195,8 +145,6 @@ div.innerHTML=`
 updateBreakButtons()
 
 
-/* ---------- BREAK FUNCTIONS ---------- */
-
 function startBreak(){
 
 db.ref("shunters/"+vehicle).update({
@@ -218,8 +166,6 @@ status:"available"
 
 }
 
-
-/* ---------- LOGOUT ---------- */
 
 function logout(){
 
