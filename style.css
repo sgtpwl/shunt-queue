@@ -1,34 +1,132 @@
-body {
-  font-family: Arial, sans-serif;
-  margin: 20px;
-  background: #f4f6f8;
+/* ---------- GLOBAL ---------- */
+
+body{
+    background:#121212;
+    color:#e6e6e6;
+    font-family:Arial, Helvetica, sans-serif;
+    margin:20px;
 }
 
-h1 {
-  color: #1f2937;
+h1,h2{
+    color:#ffffff;
 }
 
-input, select, button {
-  padding: 10px;
-  margin: 5px 0;
-  font-size: 16px;
+/* ---------- BUTTONS ---------- */
+
+button{
+    background:#2b2b2b;
+    color:white;
+    border:none;
+    padding:10px 16px;
+    margin:4px;
+    border-radius:6px;
+    font-size:16px;
 }
 
-button {
-  background: #2563eb;
-  color: white;
-  border: none;
-  cursor: pointer;
+button:hover{
+    background:#3c3c3c;
+    cursor:pointer;
 }
 
-button:hover {
-  background: #1d4ed8;
+/* ---------- INPUTS ---------- */
+
+input,select{
+    background:#1e1e1e;
+    color:white;
+    border:1px solid #444;
+    padding:8px;
+    margin:4px;
+    border-radius:4px;
 }
 
-.task {
-  background: white;
-  padding: 15px;
-  margin-top: 10px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+/* ---------- TASK ROW (HORIZONTAL LAYOUT) ---------- */
+
+.task{
+    display:grid;
+    grid-template-columns:
+        40px     /* # */
+        120px    /* trailer */
+        120px    /* job */
+        80px     /* from */
+        80px     /* to */
+        100px    /* load */
+        120px    /* requested */
+        120px    /* status */
+        80px     /* shunter */
+        100px    /* time */
+        80px;    /* controls */
+
+    gap:8px;
+    align-items:center;
+
+    background:#1b1b1b;
+    border:1px solid #333;
+
+    padding:8px;
+    margin:6px 0;
+    border-radius:6px;
+}
+
+/* ---------- HEADER ROW ---------- */
+
+.queueHeader{
+    display:grid;
+    grid-template-columns:
+        40px
+        120px
+        120px
+        80px
+        80px
+        100px
+        120px
+        120px
+        80px
+        100px
+        80px;
+
+    font-weight:bold;
+    margin-top:10px;
+}
+
+/* ---------- PRIORITY ---------- */
+
+.priority{
+    color:#ffb347;
+    font-weight:bold;
+}
+
+/* ---------- SHUNTER SCREEN ---------- */
+
+.shunterScreen{
+    text-align:center;
+}
+
+.shunterScreen h2{
+    font-size:48px;
+    margin-top:20px;
+}
+
+.shunterScreen .big{
+    font-size:30px;
+}
+
+.shunterScreen button{
+    width:90%;
+    height:90px;
+    font-size:32px;
+    margin-top:20px;
+}
+
+/* ---------- MOBILE SUPERVISOR ---------- */
+
+@media(max-width:700px){
+
+.task{
+grid-template-columns:1fr;
+}
+
+.queueHeader{
+display:none;
+}
+
 }
