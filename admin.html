@@ -43,7 +43,7 @@
 <button onclick="setFilter('7d')">7 Days</button>
 <button onclick="setFilter('30d')">30 Days</button>
 
-<button onclick="downloadCSV()">Download CSV</button>
+<button onclick="downloadCSV()">Download Completed Jobs CSV</button>
 
 </div>
 
@@ -66,6 +66,15 @@
 </div>
 
 <div id="completed"></div>
+
+<hr>
+
+<h2>Activity Logs</h2>
+
+<button onclick="downloadActivity('today')">Download Activity (Today)</button>
+<button onclick="downloadActivity('24h')">Download Activity (24 Hours)</button>
+<button onclick="downloadActivity('7d')">Download Activity (7 Days)</button>
+<button onclick="downloadActivity('30d')">Download Activity (30 Days)</button>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -108,6 +117,7 @@ db.ref("powerConnections").remove()
 alert("Power connections cleared")
 
 }
+
 
 function loadCompleted(){
 
@@ -188,6 +198,7 @@ duration
 
 }
 
+
 function downloadCSV(){
 
 let csv="Trailer,Job,From,To/Bay,Load,Requested By,Completed By,Requested,Accepted,Completed,Duration\n"
@@ -203,9 +214,61 @@ let url=URL.createObjectURL(blob)
 let a=document.createElement("a")
 
 a.href=url
-a.download="shunt-report.csv"
+a.download="completed_jobs.csv"
 
 a.click()
+
+}
+
+
+
+function downloadActivity(range){
+
+db.ref("activityLog").once("value").then(snap=>{
+
+let now = Date.now()
+
+let rows=[]
+
+snap.forEach(child=>{
+
+let a = child.val()
+
+let age = now - a.time
+
+if(range=="today" && age>86400000) return
+if(range=="24h" && age>86400000) return
+if(range=="7d" && age>604800000) return
+if(range=="30d" && age>2592000000) return
+
+rows.push([
+new Date(a.time).toLocaleString(),
+a.vehicle,
+a.driver,
+a.type,
+a.trailer
+])
+
+})
+
+let csv="Time,Vehicle,Driver,Event,Trailer\n"
+
+rows.forEach(r=>{
+csv+=r.join(",")+"\n"
+})
+
+let blob=new Blob([csv],{type:"text/csv"})
+
+let url=URL.createObjectURL(blob)
+
+let a=document.createElement("a")
+
+a.href=url
+a.download="activity_log.csv"
+
+a.click()
+
+})
 
 }
 
