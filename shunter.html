@@ -1,178 +1,212 @@
 <!DOCTYPE html>
 <html>
 <head>
-
 <title>Shunter</title>
-
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <link rel="stylesheet" href="style.css">
-
 </head>
 
-<body class="shunterScreen">
+<body>
 
-<h2 id="vehicle"></h2>
+<h1>Shunter</h1>
 
-<div id="taskArea">
-Loading...
+<div id="loginArea">
+    <select id="vehicle">
+        <option value="OZS">OZS</option>
+        <option value="MYJ">MYJ</option>
+        <option value="XSH">XSH</option>
+        <option value="TZK">TZK</option>
+        <option value="SPARE">SPARE</option>
+    </select>
+
+    <input id="driverName" placeholder="Driver name">
+
+    <button onclick="login()">Login</button>
 </div>
+
+<div id="mainArea" style="display:none">
+
+<h2 id="vehicleTitle"></h2>
+
+<div id="taskArea"></div>
 
 <br>
 
-<div id="breakControls"></div>
-
+<button onclick="startBreak()">Break</button>
+<button onclick="endBreak()">End Break</button>
 <button onclick="logout()">End Shift</button>
+
+</div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
 <script src="config.js"></script>
 <script src="app.js"></script>
 
 <script>
 
-const vehicle = localStorage.getItem("vehicle")
-const driver = localStorage.getItem("driver")
+let currentVehicle = null
+let driverName = null
 
-if(!vehicle){
-window.location.href="shunter-login.html"
+function login(){
+
+    currentVehicle = document.getElementById("vehicle").value
+    driverName = document.getElementById("driverName").value
+
+    if(driverName==""){
+        alert("Enter driver name")
+        return
+    }
+
+    db.ref("shunters/"+currentVehicle).set({
+        online:true,
+        driver:driverName,
+        break:false
+    })
+
+    document.getElementById("loginArea").style.display="none"
+    document.getElementById("mainArea").style.display="block"
+
+    document.getElementById("vehicleTitle").innerText=currentVehicle+" ("+driverName+")"
+
+    watchTasks()
 }
 
-document.getElementById("vehicle").innerText =
-vehicle + " - " + driver
+function logout(){
 
+    db.ref("shunters/"+currentVehicle).remove()
 
-db.ref("tasks").on("value", snap => {
-
-let tasks=[]
-
-snap.forEach(child=>{
-let t=child.val()
-t.id=child.key
-tasks.push(t)
-})
-
-tasks = tasks.filter(t=>t.status!=="completed")
-
-tasks.sort((a,b)=>(a.position||0)-(b.position||0))
-
-let mine = tasks.find(t=>t.status==="accepted" && t.acceptedBy===vehicle)
-let next = tasks.find(t=>t.status==="waiting")
-
-let task = mine || next
-
-const div=document.getElementById("taskArea")
-
-if(!task){
-div.innerHTML="No tasks waiting"
-return
+    location.reload()
 }
-
-let location=""
-
-if(task.type==="Move Trailer"){
-
-location=(task.from||"?")+" → "+(task.to||"?")
-
-}else{
-
-location="Bay "+(task.bay||"")
-
-}
-
-let html = `
-
-<h2>Trailer ${task.trailer}</h2>
-
-<div class="big">${task.type}</div>
-
-<div class="big">${location}</div>
-
-<div class="big">${task.loadType || ""}</div>
-
-`
-
-if(task.priority){
-html+=`<div class="priority">PRIORITY</div>`
-}
-
-if(task.status==="waiting"){
-html+=`<button onclick="acceptTask('${task.id}')">ACCEPT</button>`
-}
-
-if(task.status==="accepted" && task.acceptedBy===vehicle){
-
-html+=`<button onclick="completeTask('${task.id}')">COMPLETE</button>`
-
-if(task.priority){
-html+=`<br><button onclick="notifyGatehouse('${task.id}')">Notify Gatehouse</button>`
-}
-
-}
-
-div.innerHTML=html
-
-})
-
-
-function updateBreakButtons(){
-
-db.ref("shunters/"+vehicle).on("value", snap=>{
-
-let s=snap.val()
-
-const div=document.getElementById("breakControls")
-
-if(!s || s.status!=="break"){
-
-div.innerHTML=`
-<button onclick="startBreak()">Start Break</button>
-`
-
-}else{
-
-div.innerHTML=`
-<button onclick="endBreak()">End Break</button>
-`
-
-}
-
-})
-
-}
-
-updateBreakButtons()
-
 
 function startBreak(){
 
-db.ref("shunters/"+vehicle).update({
-
-status:"break",
-breakStart:Date.now()
-
-})
+    db.ref("shunters/"+currentVehicle+"/break").set(true)
 
 }
 
 function endBreak(){
 
-db.ref("shunters/"+vehicle).update({
+    db.ref("shunters/"+currentVehicle+"/break").set(false)
 
-status:"available"
+}
 
+function watchTasks(){
+
+    db.ref("tasks").on("value",snapshot=>{
+
+        let tasks=[]
+
+        snapshot.forEach(child=>{
+            let t=child.val()
+            t.id=child.key
+            tasks.push(t)
+        })
+
+        tasks.sort((a,b)=>a.position-b.position)
+
+        let myTask = tasks.find(t=>t.acceptedBy==currentVehicle && t.status!="completed")
+
+        if(myTask){
+            renderMyTask(myTask)
+            return
+        }
+
+        let nextTask = tasks.find(t=>!t.acceptedBy && t.status=="waiting")
+
+        if(nextTask){
+            renderNextTask(nextTask)
+        }else{
+            document.getElementById("taskArea").innerHTML="<h3>No tasks waiting</h3>"
+        }
+
+    })
+
+}
+
+function renderMyTask(task){
+
+let html=""
+
+html+="<h2>Current Task</h2>"
+
+html+="<div class='taskCard'>"
+
+html+="<b>Trailer:</b> "+task.trailer+"<br>"
+html+="<b>Job:</b> "+task.type+"<br>"
+
+if(task.type=="Move Trailer"){
+
+html+="<b>From:</b> "+task.from+"<br>"
+html+="<b>To:</b> "+task.to+"<br>"
+
+}
+
+if(task.type=="Provide Power (DD)"){
+
+html+="<b>Bay:</b> "+task.bay+"<br>"
+
+}
+
+html+="<b>Load:</b> "+task.loadType+"<br><br>"
+
+html+="<button onclick='completeTask(\""+task.id+"\")'>Complete Task</button>"
+
+html+="</div>"
+
+document.getElementById("taskArea").innerHTML=html
+
+}
+
+function renderNextTask(task){
+
+let html=""
+
+html+="<h2>Next Task</h2>"
+
+html+="<div class='taskCard'>"
+
+html+="<b>Trailer:</b> "+task.trailer+"<br>"
+html+="<b>Job:</b> "+task.type+"<br>"
+
+if(task.type=="Move Trailer"){
+
+html+="<b>From:</b> "+task.from+"<br>"
+html+="<b>To:</b> "+task.to+"<br>"
+
+}
+
+if(task.type=="Provide Power (DD)"){
+
+html+="<b>Bay:</b> "+task.bay+"<br>"
+
+}
+
+html+="<b>Load:</b> "+task.loadType+"<br><br>"
+
+html+="<button onclick='acceptTask(\""+task.id+"\")'>Accept Task</button>"
+
+html+="</div>"
+
+document.getElementById("taskArea").innerHTML=html
+
+}
+
+function acceptTask(id){
+
+db.ref("tasks/"+id).update({
+acceptedBy:currentVehicle,
+acceptedTime:Date.now(),
+status:"accepted"
 })
 
 }
 
-function logout(){
+function completeTask(id){
 
-db.ref("shunters/"+vehicle).remove()
-
-localStorage.clear()
-
-window.location.href="index.html"
+db.ref("tasks/"+id).update({
+completedTime:Date.now(),
+status:"completed"
+})
 
 }
 
