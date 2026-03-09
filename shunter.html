@@ -20,9 +20,7 @@ Loading...
 
 <br>
 
-<button onclick="startBreak()">Start Break</button>
-
-<button onclick="endBreak()">End Break</button>
+<div id="breakControls"></div>
 
 <button onclick="logout()">End Shift</button>
 
@@ -142,7 +140,38 @@ div.innerHTML=html
 loadTask()
 
 
-/* ---------- BREAK CONTROLS ---------- */
+/* ---------- BREAK BUTTON CONTROL ---------- */
+
+function updateBreakButtons(){
+
+db.ref("shunters/"+vehicle).on("value",snap=>{
+
+let s=snap.val()
+
+const div=document.getElementById("breakControls")
+
+if(!s || s.status!=="break"){
+
+div.innerHTML=`
+<button onclick="startBreak()">Start Break</button>
+`
+
+}else{
+
+div.innerHTML=`
+<button onclick="endBreak()">End Break</button>
+`
+
+}
+
+})
+
+}
+
+updateBreakButtons()
+
+
+/* ---------- BREAK FUNCTIONS ---------- */
 
 function startBreak(){
 
