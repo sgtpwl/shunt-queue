@@ -5,9 +5,20 @@ role: localStorage.getItem("userRole") || "unknown"
 }
 }
 
-/* ADD TASK */
+/* ---------- ADD TASK ---------- */
+
+let lastSubmitTime = 0
 
 function addTask(btn){
+
+let now = Date.now()
+
+if(now - lastSubmitTime < 3000){
+alert("Please wait a moment before adding another task")
+return
+}
+
+lastSubmitTime = now
 
 btn.disabled=true
 btn.innerText="Submitting..."
@@ -25,14 +36,25 @@ let priority=document.getElementById("priority")?.checked || false
 
 if(type==="move"){
 
-trailer=document.getElementById("trailer").value
+trailer=document.getElementById("trailer").value.trim()
 from=document.getElementById("from").value
 to=document.getElementById("to").value
 
 }else{
 
-trailer=document.getElementById("powerTrailer").value
+trailer=document.getElementById("powerTrailer").value.trim()
 bay=document.getElementById("bay").value
+
+}
+
+if(!trailer){
+
+alert("Enter trailer number")
+
+btn.disabled=false
+btn.innerText="Submit Task"
+
+return
 
 }
 
@@ -108,7 +130,7 @@ btn.innerText="Submit Task"
 
 }
 
-/* MOVE QUEUE */
+/* ---------- MOVE QUEUE ---------- */
 
 function moveUp(id){
 
@@ -171,7 +193,7 @@ db.ref("tasks/"+below.id+"/position").set(tasks[index].position)
 
 }
 
-/* DELETE TASK */
+/* ---------- DELETE TASK ---------- */
 
 function deleteTask(id){
 
@@ -181,7 +203,7 @@ db.ref("tasks/"+id).remove()
 
 }
 
-/* ACCEPT TASK */
+/* ---------- ACCEPT TASK ---------- */
 
 function acceptTask(id){
 
@@ -204,7 +226,7 @@ return task
 
 }
 
-/* COMPLETE TASK */
+/* ---------- COMPLETE TASK ---------- */
 
 function completeTask(id){
 
@@ -225,7 +247,7 @@ status:"available"
 
 }
 
-/* GATEHOUSE NOTIFY */
+/* ---------- GATEHOUSE NOTIFY ---------- */
 
 function notifyGatehouse(id){
 
@@ -238,7 +260,7 @@ gatehouseTime:Date.now()
 
 }
 
-/* FINISH POWER */
+/* ---------- FINISH POWER ---------- */
 
 function finishPower(vehicle){
 
@@ -246,7 +268,7 @@ db.ref("powerConnections/"+vehicle).remove()
 
 }
 
-/* -------- SAFETY TIMER -------- */
+/* ---------- SAFETY TIMER ---------- */
 
 function safetyCheck(){
 
@@ -282,7 +304,5 @@ acceptedTime:null
 })
 
 }
-
-/* RUN EVERY MINUTE */
 
 setInterval(safetyCheck,60000)
