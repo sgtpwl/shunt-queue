@@ -43,8 +43,6 @@ document.getElementById("vehicle").innerText =
 vehicle + " - " + driver
 
 
-/* LOAD TASKS */
-
 db.ref("tasks").on("value", snap => {
 
 let tasks=[]
@@ -74,14 +72,18 @@ return
 let location=""
 
 if(task.type==="Move Trailer"){
-location=(task.from||"")+" → "+(task.to||"")
+
+location=(task.from||"?")+" → "+(task.to||"?")
+
 }else{
-location="Bay "+task.bay
+
+location="Bay "+(task.bay||"")
+
 }
 
 let html = `
 
-<h2>${task.trailer}</h2>
+<h2>Trailer ${task.trailer}</h2>
 
 <div class="big">${task.type}</div>
 
@@ -113,8 +115,6 @@ div.innerHTML=html
 
 })
 
-
-/* BREAK BUTTON CONTROL */
 
 function updateBreakButtons(){
 
@@ -165,7 +165,6 @@ status:"available"
 })
 
 }
-
 
 function logout(){
 
