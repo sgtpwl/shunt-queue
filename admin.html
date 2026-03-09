@@ -26,6 +26,8 @@
 <div>Requested</div>
 <div>Accepted</div>
 <div>Completed</div>
+<div>Wait</div>
+<div>Duration</div>
 
 </div>
 
@@ -48,6 +50,18 @@ return d.toLocaleTimeString([],{
 hour:'2-digit',
 minute:'2-digit'
 })
+
+}
+
+function formatDuration(ms){
+
+if(!ms) return ""
+
+let minutes=Math.floor(ms/60000)
+
+let seconds=Math.floor((ms%60000)/1000)
+
+return minutes+"m "+seconds+"s"
 
 }
 
@@ -75,6 +89,10 @@ div.innerHTML=""
 
 records.forEach(t=>{
 
+let wait=t.acceptedTime - t.created
+
+let duration=t.completedTime - t.acceptedTime
+
 let row=document.createElement("div")
 
 row.className="task"
@@ -100,6 +118,10 @@ row.innerHTML=`
 <div>${formatTime(t.acceptedTime)}</div>
 
 <div>${formatTime(t.completedTime)}</div>
+
+<div>${formatDuration(wait)}</div>
+
+<div>${formatDuration(duration)}</div>
 
 `
 
