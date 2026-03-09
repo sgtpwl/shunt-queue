@@ -43,6 +43,8 @@
 <button onclick="setFilter('7d')">7 Days</button>
 <button onclick="setFilter('30d')">30 Days</button>
 
+<button onclick="downloadCSV()">Download CSV</button>
+
 </div>
 
 <br>
@@ -54,6 +56,8 @@
 <div>From</div>
 <div>To/Bay</div>
 <div>Load</div>
+<div>Requested By</div>
+<div>Completed By</div>
 <div>Requested</div>
 <div>Accepted</div>
 <div>Completed</div>
@@ -72,6 +76,7 @@
 <script>
 
 let filter="today"
+let csvData=[]
 
 function setFilter(f){
 
@@ -112,6 +117,8 @@ let div=document.getElementById("completed")
 
 div.innerHTML=""
 
+csvData=[]
+
 let now=Date.now()
 
 snap.forEach(child=>{
@@ -135,6 +142,10 @@ duration=Math.round((t.completedTime-t.acceptedTime)/1000)+"s"
 
 }
 
+let requestedTime=new Date(t.created).toLocaleTimeString()
+let acceptedTime=new Date(t.acceptedTime||0).toLocaleTimeString()
+let completedTime=new Date(t.completedTime||0).toLocaleTimeString()
+
 let row=document.createElement("div")
 
 row.className="managerRow"
@@ -146,18 +157,55 @@ row.innerHTML=`
 <div>${t.from||""}</div>
 <div>${t.to||t.bay||""}</div>
 <div>${t.loadType||""}</div>
-<div>${new Date(t.created).toLocaleTimeString()}</div>
-<div>${new Date(t.acceptedTime||0).toLocaleTimeString()}</div>
-<div>${new Date(t.completedTime||0).toLocaleTimeString()}</div>
+<div>${t.requestedBy||""}</div>
+<div>${t.acceptedByDriver||""} (${t.acceptedBy||""})</div>
+<div>${requestedTime}</div>
+<div>${acceptedTime}</div>
+<div>${completedTime}</div>
 <div>${duration}</div>
 
 `
 
 div.appendChild(row)
 
+csvData.push([
+t.trailer,
+t.type,
+t.from||"",
+t.to||t.bay||"",
+t.loadType||"",
+t.requestedBy||"",
+t.acceptedByDriver||"",
+requestedTime,
+acceptedTime,
+completedTime,
+duration
+])
+
 })
 
 })
+
+}
+
+function downloadCSV(){
+
+let csv="Trailer,Job,From,To/Bay,Load,Requested By,Completed By,Requested,Accepted,Completed,Duration\n"
+
+csvData.forEach(r=>{
+csv+=r.join(",")+"\n"
+})
+
+let blob=new Blob([csv],{type:"text/csv"})
+
+let url=URL.createObjectURL(blob)
+
+let a=document.createElement("a")
+
+a.href=url
+a.download="shunt-report.csv"
+
+a.click()
 
 }
 
