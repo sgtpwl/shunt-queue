@@ -68,12 +68,26 @@ const button=document.getElementById("loginBtn")
 button.innerText="Logging in..."
 button.disabled=true
 
+/* check if vehicle already logged in */
+
+db.ref("shunters/"+vehicle).once("value").then(snap=>{
+
+if(snap.exists()){
+
+alert("Vehicle already in use")
+
+button.innerText="Login"
+button.disabled=false
+return
+
+}
+
 /* save locally */
 
 localStorage.setItem("vehicle",vehicle)
 localStorage.setItem("driver",driver)
 
-/* register shunter */
+/* create shunter record */
 
 db.ref("shunters/"+vehicle).set({
 
@@ -87,11 +101,6 @@ lastSeen:Date.now()
 window.location.href="shunter.html"
 
 })
-.catch(err=>{
-
-alert("Login failed")
-button.innerText="Login"
-button.disabled=false
 
 })
 
