@@ -14,10 +14,8 @@ let type=document.getElementById("taskType")?.value || "move"
 let requestedBy=localStorage.getItem("userName") || "unknown"
 
 if(!trailer){
-
 alert("Enter trailer number")
 return
-
 }
 
 button.disabled=true
@@ -49,9 +47,67 @@ setTimeout(()=>{
 button.disabled=false
 button.innerText="Submit Task"
 
-},5000)
+},3000)
 
 })
+
+})
+
+}
+
+
+/* ---------------- ACCEPT TASK ---------------- */
+
+function acceptTask(id){
+
+let vehicle=localStorage.getItem("vehicle")
+let driver=localStorage.getItem("driver")
+
+db.ref("tasks/"+id).once("value",snap=>{
+
+let task=snap.val()
+
+if(!task) return
+
+if(task.status!=="waiting") return
+
+db.ref("tasks/"+id).update({
+
+status:"accepted",
+acceptedBy:vehicle,
+acceptedByDriver:driver,
+acceptedTime:Date.now()
+
+})
+
+db.ref("shunters/"+vehicle).update({
+
+status:"moving",
+driver:driver
+
+})
+
+})
+
+}
+
+
+/* ---------------- COMPLETE TASK ---------------- */
+
+function completeTask(id){
+
+let vehicle=localStorage.getItem("vehicle")
+
+db.ref("tasks/"+id).update({
+
+status:"completed",
+completedTime:Date.now()
+
+})
+
+db.ref("shunters/"+vehicle).update({
+
+status:"available"
 
 })
 
@@ -159,77 +215,3 @@ db.ref("shunters/"+child.key+"/status").set("offline")
 })
 
 },30000)
-
-
-/* ---------------- LIVE SHUNTER STATUS ---------------- */
-
-function loadShunterStatus(){
-
-db.ref("shunters").on("value",snap=>{
-
-const div=document.getElementById("shunterStatus")
-
-if(!div) return
-
-div.innerHTML=""
-
-snap.forEach(child=>{
-
-let s=child.val()
-
-let vehicle=child.key
-let driver=s.driver || ""
-let status=s.status || "available"
-
-let icon="🟢"
-let text="Available"
-
-if(status==="offline"){
-icon="⚫"
-text="Offline"
-}
-
-if(status==="break"){
-icon="🔴"
-text="Break"
-}
-
-let row=document.createElement("div")
-
-row.innerHTML=`<b>${vehicle}</b> (${driver}) ${icon} ${text}`
-
-div.appendChild(row)
-
-})
-
-})
-
-/* now overlay active jobs */
-
-db.ref("tasks").on("value",snap=>{
-
-snap.forEach(child=>{
-
-let t=child.val()
-
-if(t.status==="accepted"){
-
-let shunter=t.acceptedBy
-
-let row=document.querySelector(`#shunterStatus div[data-vehicle='${shunter}']`)
-
-if(row){
-
-row.innerHTML=`<b>${shunter}</b> (${t.acceptedByDriver}) 🟡 Moving Trailer ${t.trailer}`
-
-}
-
-}
-
-})
-
-})
-
-}
-
-loadShunterStatus()
