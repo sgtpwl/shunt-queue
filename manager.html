@@ -1,303 +1,241 @@
-function currentUser(){
-return {
-name: localStorage.getItem("userName") || "Unknown",
-role: localStorage.getItem("userRole") || "unknown"
-}
-}
+<!DOCTYPE html>
+<html>
+<head>
 
-/* ---------- ADD TASK ---------- */
+<title>Manager - Shunt Queue</title>
 
-let lastSubmitTime = 0
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-function addTask(btn){
+<link rel="stylesheet" href="style.css">
 
-let now = Date.now()
+</head>
 
-if(now - lastSubmitTime < 3000){
-alert("Please wait a moment before adding another task")
-return
-}
+<body>
 
-lastSubmitTime = now
+<h1>Manager</h1>
 
-btn.disabled=true
-btn.innerText="Submitting..."
+<div id="who"></div>
 
-let user=currentUser()
+<button onclick="logout()">Logout</button>
 
-let type=document.getElementById("taskType").value
+<hr>
 
-let trailer=""
-let from=""
-let to=""
-let bay=""
-let loadType=document.getElementById("loadType")?.value || ""
-let priority=document.getElementById("priority")?.checked || false
+<h2>Shunter Status</h2>
 
-if(type==="move"){
+<div id="shunterStatus"></div>
 
-trailer=document.getElementById("trailer").value.trim()
-from=document.getElementById("from").value
-to=document.getElementById("to").value
+<hr>
 
-}else{
+<h2>Create Task</h2>
 
-trailer=document.getElementById("powerTrailer").value.trim()
-bay=document.getElementById("bay").value
+<select id="taskType" onchange="toggleTaskInputs()">
+<option value="move">Move Trailer</option>
+<option value="power">Provide Power (DD)</option>
+</select>
 
-}
+<br><br>
 
-if(!trailer){
+<label>
+<input type="checkbox" id="priority">
+Gatehouse Priority
+</label>
 
-alert("Enter trailer number")
+<br><br>
 
-btn.disabled=false
-btn.innerText="Submit Task"
+<div id="moveFields">
 
-return
+<input id="trailer" placeholder="Trailer Number">
+<input id="from" placeholder="From">
+<input id="to" placeholder="To">
 
-}
+<br><br>
 
-db.ref("tasks").once("value",snap=>{
+<select id="loadType">
+<option value="Full Load">Full Load</option>
+<option value="Empty Trailer">Empty Trailer</option>
+<option value="Trunk Trailer">Trunk Trailer</option>
+</select>
 
-let tasks=[]
-snap.forEach(child=>{
-let t=child.val()
-t.id=child.key
-tasks.push(t)
-})
+</div>
 
-tasks.sort((a,b)=>a.position-b.position)
+<div id="powerFields" style="display:none">
 
-let lastAccepted=0
+<input id="powerTrailer" placeholder="Trailer Number">
 
-tasks.forEach(t=>{
-if(t.status==="accepted"){
-lastAccepted=Math.max(lastAccepted,t.position)
-}
-})
+<br><br>
 
-let newPosition
+<select id="bay">
+<option value="">Select Bay</option>
+</select>
 
-if(priority){
+</div>
 
-newPosition=lastAccepted+1
+<br><br>
 
-tasks.forEach(t=>{
-if(t.position>=newPosition){
-db.ref("tasks/"+t.id+"/position").set(t.position+1)
-}
-})
+<button onclick="addTask(this)">Submit Task</button>
 
-}else{
+<hr>
 
-let max=0
-tasks.forEach(t=>{
-max=Math.max(max,t.position)
-})
+<h2>Queue</h2>
 
-newPosition=max+1
+<div class="queueHeader">
 
-}
+<div>#</div>
+<div>Trailer</div>
+<div>Job</div>
+<div>From</div>
+<div>To</div>
+<div>Load</div>
+<div>Requested By</div>
+<div>Status</div>
+<div>Shunter</div>
+<div>Move</div>
 
-db.ref("tasks").push({
+</div>
 
-type:type==="move"?"Move Trailer":"Provide Power (DD)",
-trailer:trailer,
-from:from,
-to:to,
-bay:bay,
-loadType:loadType,
-priority:priority,
-requestedBy:user.name,
-requestedRole:user.role,
-status:"waiting",
-created:Date.now(),
-position:newPosition
+<div id="tasks"></div>
 
-})
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-btn.innerText="Task Added ✓"
+<script src="config.js"></script>
+<script src="app.js"></script>
 
-setTimeout(()=>{
+<script>
 
-btn.disabled=false
-btn.innerText="Submit Task"
+function requireLogin(){
 
-},3000)
+const name=localStorage.getItem("userName")
+const role=localStorage.getItem("userRole")
 
-})
-
+if(!name || role!=="Manager"){
+window.location.href="manager-login.html"
+return false
 }
 
-/* ---------- MOVE QUEUE ---------- */
+document.getElementById("who").innerHTML="Logged in as "+name
 
-function moveUp(id){
+return true
+}
 
-db.ref("tasks").once("value",snap=>{
+function logout(){
+localStorage.clear()
+window.location.href="index.html"
+}
 
-let tasks=[]
+function toggleTaskInputs(){
 
-snap.forEach(child=>{
-let t=child.val()
-t.id=child.key
-tasks.push(t)
-})
+const type=document.getElementById("taskType").value
 
-tasks.sort((a,b)=>a.position-b.position)
-
-let index=tasks.findIndex(t=>t.id===id)
-
-if(index<=3) return
-
-let above=tasks[index-1]
-
-if(tasks[index].status!=="waiting") return
-if(above.status!=="waiting") return
-
-db.ref("tasks/"+id+"/position").set(above.position)
-db.ref("tasks/"+above.id+"/position").set(tasks[index].position)
-
-})
+document.getElementById("moveFields").style.display=(type==="move")?"block":"none"
+document.getElementById("powerFields").style.display=(type==="power")?"block":"none"
 
 }
 
-function moveDown(id){
+function populateBays(){
 
-db.ref("tasks").once("value",snap=>{
+const bay=document.getElementById("bay")
 
-let tasks=[]
+for(let i=1;i<=25;i++){
+let o=document.createElement("option")
+o.value="B"+i
+o.innerText="B"+i
+bay.appendChild(o)
+}
+
+for(let i=1;i<=26;i++){
+let o=document.createElement("option")
+o.value="C"+i
+o.innerText="C"+i
+bay.appendChild(o)
+}
+
+}
+
+if(requireLogin()){
+
+populateBays()
+
+/* QUEUE */
+
+db.ref("tasks").on("value",snap=>{
+
+let all=[]
 
 snap.forEach(child=>{
 let t=child.val()
 t.id=child.key
-tasks.push(t)
+all.push(t)
 })
 
-tasks.sort((a,b)=>a.position-b.position)
+all.sort((a,b)=>(a.position||0)-(b.position||0))
 
-let index=tasks.findIndex(t=>t.id===id)
+const tasks=all.filter(t=>t.status!=="completed")
 
-if(index<4) return
-if(index===tasks.length-1) return
+const div=document.getElementById("tasks")
+div.innerHTML=""
 
-let below=tasks[index+1]
+tasks.forEach((t,i)=>{
 
-if(tasks[index].status!=="waiting") return
-if(below.status!=="waiting") return
+const row=document.createElement("div")
+row.className="managerRow"
 
-db.ref("tasks/"+id+"/position").set(below.position)
-db.ref("tasks/"+below.id+"/position").set(tasks[index].position)
+row.innerHTML=`
 
-})
+<div>${i+1}</div>
+<div>${t.trailer||""}</div>
+<div>${t.type||""}</div>
+<div>${t.from||""}</div>
+<div>${t.to||t.bay||""}</div>
+<div>${t.loadType||""}</div>
+<div>${t.requestedBy||""}</div>
+<div>${t.status||""}</div>
+<div>${t.acceptedBy||""}</div>
+<div id="controls-${t.id}"></div>
+
+`
+
+div.appendChild(row)
+
+const controls=document.getElementById("controls-"+t.id)
+
+if(t.status==="waiting" && i>=4){
+
+const up=document.createElement("button")
+up.innerText="▲"
+up.onclick=()=>moveUp(t.id)
+
+const down=document.createElement("button")
+down.innerText="▼"
+down.onclick=()=>moveDown(t.id)
+
+controls.appendChild(up)
+controls.appendChild(down)
 
 }
 
-/* ---------- DELETE TASK ---------- */
-
-function deleteTask(id){
-
-if(!confirm("Delete task?")) return
-
-db.ref("tasks/"+id).remove()
-
-}
-
-/* ---------- ACCEPT TASK ---------- */
-
-function acceptTask(id){
-
-let vehicle=localStorage.getItem("vehicle")
-let driver=localStorage.getItem("driver")
-
-db.ref("tasks/"+id).transaction(task=>{
-
-if(task===null) return task
-if(task.status!=="waiting") return
-
-task.status="accepted"
-task.acceptedBy=vehicle
-task.driver=driver
-task.acceptedTime=Date.now()
-
-return task
+})
 
 })
 
-}
+/* SHUNTER STATUS */
 
-/* ---------- COMPLETE TASK ---------- */
+db.ref("shunters").on("value",snap=>{
 
-function completeTask(id){
-
-let vehicle=localStorage.getItem("vehicle")
-
-db.ref("tasks/"+id).update({
-
-status:"completed",
-completedTime:Date.now()
-
-})
-
-db.ref("shunters/"+vehicle).update({
-
-status:"available"
-
-})
-
-}
-
-/* ---------- GATEHOUSE NOTIFY ---------- */
-
-function notifyGatehouse(id){
-
-db.ref("tasks/"+id).update({
-
-gatehouseNotified:true,
-gatehouseTime:Date.now()
-
-})
-
-}
-
-/* ---------- FINISH POWER ---------- */
-
-function finishPower(vehicle){
-
-db.ref("powerConnections/"+vehicle).remove()
-
-}
-
-/* ---------- SAFETY TIMER ---------- */
-
-function safetyCheck(){
-
-const limit=15*60*1000
-
-db.ref("tasks").once("value",snap=>{
+const div=document.getElementById("shunterStatus")
+div.innerHTML=""
 
 snap.forEach(child=>{
 
-let t=child.val()
+const s=child.val()
 
-if(t.status==="accepted"){
+let row=document.createElement("div")
 
-let now=Date.now()
+row.innerHTML=`
+<b>${child.key}</b> — ${s.status}
+`
 
-if(now-t.acceptedTime>limit){
-
-db.ref("tasks/"+child.key).update({
-
-status:"waiting",
-acceptedBy:null,
-driver:null,
-acceptedTime:null
-
-})
-
-}
-
-}
+div.appendChild(row)
 
 })
 
@@ -305,4 +243,12 @@ acceptedTime:null
 
 }
 
-setInterval(safetyCheck,60000)
+</script>
+
+<div class="footer">
+Shunt Queue System<br>
+© Lee Powell 2026
+</div>
+
+</body>
+</html>
