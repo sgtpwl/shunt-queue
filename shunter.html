@@ -1,125 +1,142 @@
 <!DOCTYPE html>
 <html>
 <head>
+
 <title>Shunter</title>
 <link rel="stylesheet" href="style.css">
+
 </head>
 
 <body>
 
+<div class="container">
+
 <h1>Shunter</h1>
 
-<div id="loginArea">
-    <select id="vehicle">
-        <option value="OZS">OZS</option>
-        <option value="MYJ">MYJ</option>
-        <option value="XSH">XSH</option>
-        <option value="TZK">TZK</option>
-        <option value="SPARE">SPARE</option>
-    </select>
+<div id="loginBox">
 
-    <input id="driverName" placeholder="Driver name">
+<select id="vehicle">
+<option value="OZS">OZS</option>
+<option value="MYJ">MYJ</option>
+<option value="XSH">XSH</option>
+<option value="TZK">TZK</option>
+<option value="SPARE">SPARE</option>
+</select>
 
-    <button onclick="login()">Login</button>
+<input id="driverName" placeholder="Driver name">
+
+<button onclick="loginShunter()">Login</button>
+
 </div>
 
-<div id="mainArea" style="display:none">
+<div id="mainScreen" style="display:none">
 
 <h2 id="vehicleTitle"></h2>
 
-<div id="taskArea"></div>
+<div id="taskCard"></div>
 
-<br>
+<div class="shunterButtons">
 
 <button onclick="startBreak()">Break</button>
 <button onclick="endBreak()">End Break</button>
-<button onclick="logout()">End Shift</button>
+<button onclick="endShift()">End Shift</button>
+
+</div>
+
+</div>
 
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
 <script src="config.js"></script>
 <script src="app.js"></script>
 
 <script>
 
-let currentVehicle = null
-let driverName = null
+let vehicle = null
+let driver = null
 
-function login(){
+function loginShunter(){
 
-    currentVehicle = document.getElementById("vehicle").value
-    driverName = document.getElementById("driverName").value
+vehicle = document.getElementById("vehicle").value
+driver = document.getElementById("driverName").value
 
-    if(driverName==""){
-        alert("Enter driver name")
-        return
-    }
-
-    db.ref("shunters/"+currentVehicle).set({
-        online:true,
-        driver:driverName,
-        break:false
-    })
-
-    document.getElementById("loginArea").style.display="none"
-    document.getElementById("mainArea").style.display="block"
-
-    document.getElementById("vehicleTitle").innerText=currentVehicle+" ("+driverName+")"
-
-    watchTasks()
+if(driver==""){
+alert("Enter driver name")
+return
 }
 
-function logout(){
+db.ref("shunters/"+vehicle).set({
+vehicle:vehicle,
+driver:driver,
+status:"online",
+break:false
+})
 
-    db.ref("shunters/"+currentVehicle).remove()
+document.getElementById("loginBox").style.display="none"
+document.getElementById("mainScreen").style.display="block"
 
-    location.reload()
+document.getElementById("vehicleTitle").innerText = vehicle+" ("+driver+")"
+
+watchTasks()
+
+}
+
+function endShift(){
+
+db.ref("shunters/"+vehicle).remove()
+
+location.reload()
+
 }
 
 function startBreak(){
 
-    db.ref("shunters/"+currentVehicle+"/break").set(true)
+db.ref("shunters/"+vehicle+"/break").set(true)
 
 }
 
 function endBreak(){
 
-    db.ref("shunters/"+currentVehicle+"/break").set(false)
+db.ref("shunters/"+vehicle+"/break").set(false)
 
 }
 
 function watchTasks(){
 
-    db.ref("tasks").on("value",snapshot=>{
+db.ref("tasks").on("value",snapshot=>{
 
-        let tasks=[]
+let tasks=[]
 
-        snapshot.forEach(child=>{
-            let t=child.val()
-            t.id=child.key
-            tasks.push(t)
-        })
+snapshot.forEach(child=>{
 
-        tasks.sort((a,b)=>a.position-b.position)
+let t=child.val()
+t.id=child.key
+tasks.push(t)
 
-        let myTask = tasks.find(t=>t.acceptedBy==currentVehicle && t.status!="completed")
+})
 
-        if(myTask){
-            renderMyTask(myTask)
-            return
-        }
+tasks.sort((a,b)=>a.position-b.position)
 
-        let nextTask = tasks.find(t=>!t.acceptedBy && t.status=="waiting")
+let myTask = tasks.find(t=>t.acceptedBy==vehicle && t.status!="completed")
 
-        if(nextTask){
-            renderNextTask(nextTask)
-        }else{
-            document.getElementById("taskArea").innerHTML="<h3>No tasks waiting</h3>"
-        }
+if(myTask){
+renderMyTask(myTask)
+return
+}
 
-    })
+let nextTask = tasks.find(t=>!t.acceptedBy && t.status=="waiting")
+
+if(nextTask){
+renderNextTask(nextTask)
+}
+else{
+document.getElementById("taskCard").innerHTML="<h2>No tasks waiting</h2>"
+}
+
+})
 
 }
 
@@ -127,9 +144,9 @@ function renderMyTask(task){
 
 let html=""
 
-html+="<h2>Current Task</h2>"
+html+="<div class='taskBox'>"
 
-html+="<div class='taskCard'>"
+html+="<h2>CURRENT TASK</h2>"
 
 html+="<b>Trailer:</b> "+task.trailer+"<br>"
 html+="<b>Job:</b> "+task.type+"<br>"
@@ -153,7 +170,7 @@ html+="<button onclick='completeTask(\""+task.id+"\")'>Complete Task</button>"
 
 html+="</div>"
 
-document.getElementById("taskArea").innerHTML=html
+document.getElementById("taskCard").innerHTML=html
 
 }
 
@@ -161,9 +178,9 @@ function renderNextTask(task){
 
 let html=""
 
-html+="<h2>Next Task</h2>"
+html+="<div class='taskBox'>"
 
-html+="<div class='taskCard'>"
+html+="<h2>NEXT TASK</h2>"
 
 html+="<b>Trailer:</b> "+task.trailer+"<br>"
 html+="<b>Job:</b> "+task.type+"<br>"
@@ -187,14 +204,14 @@ html+="<button onclick='acceptTask(\""+task.id+"\")'>Accept Task</button>"
 
 html+="</div>"
 
-document.getElementById("taskArea").innerHTML=html
+document.getElementById("taskCard").innerHTML=html
 
 }
 
 function acceptTask(id){
 
 db.ref("tasks/"+id).update({
-acceptedBy:currentVehicle,
+acceptedBy:vehicle,
 acceptedTime:Date.now(),
 status:"accepted"
 })
