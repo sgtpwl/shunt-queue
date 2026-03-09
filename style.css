@@ -204,15 +204,28 @@ grid-template-columns:1fr;
 display:none;
 }
 
+/* ---------- PAGE LAYOUT ---------- */
 
+html, body {
+height:100%;
+margin:0;
+display:flex;
+flex-direction:column;
+}
+
+/* ---------- MAIN CONTENT ---------- */
+
+body > *:not(.footer){
+flex:1 0 auto;
+}
 
 /* ---------- FOOTER ---------- */
 
 .footer{
 
-margin-top:40px;
+flex-shrink:0;
 
-padding-top:15px;
+padding:15px;
 
 border-top:1px solid #333;
 
@@ -222,8 +235,13 @@ color:#888;
 
 text-align:center;
 
+background:#121212;
+
 }
+
+
   
 
 }
+
 
