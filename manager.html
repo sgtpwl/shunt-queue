@@ -1,260 +1,301 @@
-<!DOCTYPE html>
-<html>
-<head>
+function currentUser(){
+return {
+name: localStorage.getItem("userName") || "Unknown",
+role: localStorage.getItem("userRole") || "unknown"
+}
+}
 
-<title>Manager - Shunt Queue</title>
+/* ---------- ADD TASK ---------- */
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+let lastSubmitTime = 0
 
-<link rel="stylesheet" href="style.css">
+function addTask(btn){
 
-</head>
+let now = Date.now()
 
-<body>
+if(now - lastSubmitTime < 3000){
+alert("Please wait a moment before adding another task")
+return
+}
 
-<h1>Manager</h1>
+lastSubmitTime = now
 
-<div id="who"></div>
+btn.disabled=true
+btn.innerText="Submitting..."
 
-<button onclick="logout()">Logout</button>
+let user=currentUser()
 
-<hr>
+let type=document.getElementById("taskType").value
 
-<h2>Create Task</h2>
+let trailer=""
+let from=""
+let to=""
+let bay=""
+let loadType=document.getElementById("loadType")?.value || ""
+let priority=document.getElementById("priority")?.checked || false
 
-<select id="taskType" onchange="toggleTaskInputs()">
-<option value="move">Move Trailer</option>
-<option value="power">Provide Power (DD)</option>
-</select>
+if(type==="move"){
 
-<br><br>
+trailer=document.getElementById("trailer").value.trim()
+from=document.getElementById("from").value
+to=document.getElementById("to").value
 
-<label>
-<input type="checkbox" id="priority">
-Gatehouse Priority
-</label>
+}else{
 
-<br><br>
-
-<div id="moveFields">
-
-<input id="trailer" placeholder="Trailer Number">
-<input id="from" placeholder="From">
-<input id="to" placeholder="To">
-
-<br><br>
-
-<select id="loadType">
-<option value="Full Load">Full Load</option>
-<option value="Empty Trailer">Empty Trailer</option>
-<option value="Trunk Trailer">Trunk Trailer</option>
-</select>
-
-</div>
-
-<div id="powerFields" style="display:none">
-
-<input id="powerTrailer" placeholder="Trailer Number">
-
-<br><br>
-
-<select id="bay">
-<option value="">Select Bay</option>
-</select>
-
-</div>
-
-<br><br>
-
-<button onclick="addTask(this)">Submit Task</button>
-
-<p id="msg"></p>
-
-<hr>
-
-<h2>Active Power</h2>
-
-<div id="powerConnections"></div>
-
-<hr>
-
-<h2>Queue</h2>
-
-<div class="queueHeader">
-
-<div>#</div>
-<div>Trailer</div>
-<div>Job</div>
-<div>From</div>
-<div>To</div>
-<div>Load</div>
-<div>Requested By</div>
-<div>Status</div>
-<div>Shunter</div>
-<div>Time</div>
-<div>Move</div>
-
-</div>
-
-<div id="tasks"></div>
-
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
-<script src="config.js"></script>
-<script src="app.js"></script>
-
-<script>
-
-function requireLogin(){
-
-const name=localStorage.getItem("userName")
-const role=localStorage.getItem("userRole")
-
-if(!name || role!=="Manager"){
-
-window.location.href="manager-login.html"
-return false
+trailer=document.getElementById("powerTrailer").value.trim()
+bay=document.getElementById("bay").value
 
 }
 
-document.getElementById("who").innerHTML="Logged in as "+name
+if(!trailer){
 
-return true
+alert("Enter trailer number")
 
-}
+btn.disabled=false
+btn.innerText="Submit Task"
 
-function logout(){
-
-localStorage.removeItem("userName")
-localStorage.removeItem("userRole")
-
-window.location.href="index.html"
+return
 
 }
 
-function toggleTaskInputs(){
+db.ref("tasks").once("value",snap=>{
 
-const type=document.getElementById("taskType").value
+let tasks=[]
+snap.forEach(child=>{
+let t=child.val()
+t.id=child.key
+tasks.push(t)
+})
 
-document.getElementById("moveFields").style.display=(type==="move")?"block":"none"
-document.getElementById("powerFields").style.display=(type==="power")?"block":"none"
+tasks.sort((a,b)=>a.position-b.position)
+
+let lastAccepted=0
+
+tasks.forEach(t=>{
+if(t.status==="accepted"){
+lastAccepted=Math.max(lastAccepted,t.position)
+}
+})
+
+let newPosition
+
+if(priority){
+
+newPosition=lastAccepted+1
+
+tasks.forEach(t=>{
+if(t.position>=newPosition){
+db.ref("tasks/"+t.id+"/position").set(t.position+1)
+}
+})
+
+}else{
+
+let max=0
+tasks.forEach(t=>{
+max=Math.max(max,t.position)
+})
+
+newPosition=max+1
 
 }
 
-function populateBays(){
+db.ref("tasks").push({
 
-const bay=document.getElementById("bay")
+type:type==="move"?"Move Trailer":"Provide Power (DD)",
+trailer:trailer,
+from:from,
+to:to,
+bay:bay,
+loadType:loadType,
+priority:priority,
+requestedBy:user.name,
+requestedRole:user.role,
+status:"waiting",
+created:Date.now(),
+position:newPosition
 
-for(let i=1;i<=25;i++){
+})
 
-let o=document.createElement("option")
-o.value="B"+i
-o.innerText="B"+i
+btn.innerText="Task Added ✓"
 
-bay.appendChild(o)
+setTimeout(()=>{
 
-}
+btn.disabled=false
+btn.innerText="Submit Task"
 
-for(let i=1;i<=26;i++){
+},3000)
 
-let o=document.createElement("option")
-o.value="C"+i
-o.innerText="C"+i
-
-bay.appendChild(o)
-
-}
-
-}
-
-function formatTime(ts){
-
-if(!ts) return ""
-
-const d=new Date(ts)
-
-return d.toLocaleTimeString([],{
-hour:'2-digit',
-minute:'2-digit'
 })
 
 }
 
-if(requireLogin()){
+/* ---------- MOVE QUEUE ---------- */
 
-populateBays()
+function moveUp(id){
 
-db.ref("tasks").on("value",snap=>{
+db.ref("tasks").once("value",snap=>{
 
-let all=[]
+let tasks=[]
+
+snap.forEach(child=>{
+let t=child.val()
+t.id=child.key
+tasks.push(t)
+})
+
+tasks.sort((a,b)=>a.position-b.position)
+
+let index=tasks.findIndex(t=>t.id===id)
+
+if(index<=3) return
+
+let above=tasks[index-1]
+
+if(tasks[index].status!=="waiting") return
+if(above.status!=="waiting") return
+
+db.ref("tasks/"+id+"/position").set(above.position)
+db.ref("tasks/"+above.id+"/position").set(tasks[index].position)
+
+})
+
+}
+
+function moveDown(id){
+
+db.ref("tasks").once("value",snap=>{
+
+let tasks=[]
+
+snap.forEach(child=>{
+let t=child.val()
+t.id=child.key
+tasks.push(t)
+})
+
+tasks.sort((a,b)=>a.position-b.position)
+
+let index=tasks.findIndex(t=>t.id===id)
+
+if(index<4) return
+if(index===tasks.length-1) return
+
+let below=tasks[index+1]
+
+if(tasks[index].status!=="waiting") return
+if(below.status!=="waiting") return
+
+db.ref("tasks/"+id+"/position").set(below.position)
+db.ref("tasks/"+below.id+"/position").set(tasks[index].position)
+
+})
+
+}
+
+/* ---------- DELETE TASK ---------- */
+
+function deleteTask(id){
+
+if(!confirm("Delete task?")) return
+
+db.ref("tasks/"+id).remove()
+
+}
+
+/* ---------- ACCEPT TASK ---------- */
+
+function acceptTask(id){
+
+let vehicle=localStorage.getItem("vehicle")
+let driver=localStorage.getItem("driver")
+
+db.ref("tasks/"+id).transaction(task=>{
+
+if(task===null) return task
+if(task.status!=="waiting") return
+
+task.status="accepted"
+task.acceptedBy=vehicle
+task.driver=driver
+task.acceptedTime=Date.now()
+
+return task
+
+})
+
+}
+
+/* ---------- COMPLETE TASK ---------- */
+
+function completeTask(id){
+
+let vehicle=localStorage.getItem("vehicle")
+
+db.ref("tasks/"+id).update({
+
+status:"completed",
+completedTime:Date.now()
+
+})
+
+db.ref("shunters/"+vehicle).update({
+
+status:"available"
+
+})
+
+}
+
+/* ---------- GATEHOUSE NOTIFY ---------- */
+
+function notifyGatehouse(id){
+
+db.ref("tasks/"+id).update({
+
+gatehouseNotified:true,
+gatehouseTime:Date.now()
+
+})
+
+}
+
+/* ---------- FINISH POWER ---------- */
+
+function finishPower(vehicle){
+
+db.ref("powerConnections/"+vehicle).remove()
+
+}
+
+/* ---------- SAFETY TIMER ---------- */
+
+function safetyCheck(){
+
+const limit=15*60*1000
+
+db.ref("tasks").once("value",snap=>{
 
 snap.forEach(child=>{
 
 let t=child.val()
 
-t.id=child.key
+if(t.status==="accepted"){
 
-all.push(t)
+let now=Date.now()
+
+if(now-t.acceptedTime>limit){
+
+db.ref("tasks/"+child.key).update({
+
+status:"waiting",
+acceptedBy:null,
+driver:null,
+acceptedTime:null
 
 })
 
-all.sort((a,b)=>(a.position||0)-(b.position||0))
-
-const tasks=all.filter(t=>t.status!=="completed")
-
-const div=document.getElementById("tasks")
-
-div.innerHTML=""
-
-tasks.forEach((t,i)=>{
-
-const row=document.createElement("div")
-
-row.className="managerRow"
-
-row.innerHTML=`
-
-<div>${i+1}</div>
-
-<div>${t.trailer||""}</div>
-
-<div>${t.type||""}</div>
-
-<div>${t.from||""}</div>
-
-<div>${t.to||t.bay||""}</div>
-
-<div>${t.loadType||""}</div>
-
-<div>${t.requestedBy||""}</div>
-
-<div>${t.status||""}</div>
-
-<div>${t.acceptedBy||""}</div>
-
-<div>${formatTime(t.created)}</div>
-
-<div id="controls-${t.id}"></div>
-
-`
-
-div.appendChild(row)
-
-const controls=document.getElementById("controls-"+t.id)
-
-if(t.status==="waiting" && i>=4){
-
-const up=document.createElement("button")
-up.innerText="▲"
-up.onclick=()=>moveUp(t.id)
-
-const down=document.createElement("button")
-down.innerText="▼"
-down.onclick=()=>moveDown(t.id)
-
-controls.appendChild(up)
-controls.appendChild(down)
+}
 
 }
 
@@ -264,8 +305,4 @@ controls.appendChild(down)
 
 }
 
-</script>
-
-</body>
-</html>
-
+setInterval(safetyCheck,60000)
