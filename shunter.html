@@ -15,10 +15,16 @@
 <h2 id="vehicle"></h2>
 
 <div id="taskArea">
-
 Loading...
-
 </div>
+
+<br>
+
+<button onclick="startBreak()">Start Break</button>
+
+<button onclick="endBreak()">End Break</button>
+
+<button onclick="logout()">End Shift</button>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -40,6 +46,8 @@ window.location.href="shunter-login.html"
 document.getElementById("vehicle").innerText=
 vehicle+" - "+driver
 
+
+/* ---------- LOAD TASK ---------- */
 
 function loadTask(){
 
@@ -132,6 +140,43 @@ div.innerHTML=html
 }
 
 loadTask()
+
+
+/* ---------- BREAK CONTROLS ---------- */
+
+function startBreak(){
+
+db.ref("shunters/"+vehicle).update({
+
+status:"break",
+breakStart:Date.now()
+
+})
+
+}
+
+function endBreak(){
+
+db.ref("shunters/"+vehicle).update({
+
+status:"available"
+
+})
+
+}
+
+
+/* ---------- LOGOUT ---------- */
+
+function logout(){
+
+db.ref("shunters/"+vehicle).remove()
+
+localStorage.clear()
+
+window.location.href="index.html"
+
+}
 
 </script>
 
