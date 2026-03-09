@@ -2,7 +2,7 @@
 <html>
 <head>
 
-<title>Admin Panel</title>
+<title>Admin</title>
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -14,144 +14,103 @@
 
 <h1>Admin Panel</h1>
 
-<h2>System Tools</h2>
+<h2>Reset Shunters</h2>
 
-<button onclick="resetShunters()">Reset Shunters</button>
-
-<button onclick="resetPower()">Reset Power Connections</button>
-
-<button onclick="clearStuck()">Clear Stuck Tasks</button>
-
-<button onclick="deleteCompleted()">Delete Completed Tasks</button>
-
-<button onclick="downloadCSV()">Download CSV</button>
-
-<hr>
-
-<h2>Completed Job Records</h2>
-
-<label>Filter:</label>
-
-<select id="filter" onchange="loadRecords()">
-<option value="1">Today</option>
-<option value="7">Last 7 Days</option>
-<option value="30">Last 30 Days</option>
-<option value="all">All</option>
-</select>
+<button onclick="resetVehicle('OZS')">Reset OZS</button>
+<button onclick="resetVehicle('MYJ')">Reset MYJ</button>
+<button onclick="resetVehicle('XSH')">Reset XSH</button>
+<button onclick="resetVehicle('TZK')">Reset TZK</button>
+<button onclick="resetVehicle('SPARE')">Reset SPARE</button>
 
 <br><br>
 
-<div class="adminHeader">
+<button onclick="resetAll()">Reset All Shunters</button>
+
+<hr>
+
+<h2>Reset Power Connections</h2>
+
+<button onclick="resetPower()">Clear Power Jobs</button>
+
+<hr>
+
+<h2>Completed Jobs</h2>
+
+<div class="queueHeader">
 
 <div>Trailer</div>
 <div>Job</div>
 <div>From</div>
 <div>To</div>
 <div>Load</div>
-<div>Supervisor</div>
-<div>Shunter</div>
 <div>Requested</div>
 <div>Accepted</div>
 <div>Completed</div>
-<div>Wait</div>
-<div>Duration</div>
 
 </div>
 
-<div id="records"></div>
+<div id="completed"></div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <script src="config.js"></script>
+<script src="app.js"></script>
 
 <script>
 
-function formatTime(ts){
+function resetVehicle(vehicle){
 
-if(!ts) return ""
+db.ref("shunters/"+vehicle).remove()
 
-const d=new Date(ts)
-
-return d.toLocaleTimeString([],{
-hour:'2-digit',
-minute:'2-digit'
-})
+alert(vehicle+" reset")
 
 }
 
-function formatDuration(ms){
+function resetAll(){
 
-if(!ms) return ""
+db.ref("shunters").remove()
 
-let m=Math.floor(ms/60000)
-
-let s=Math.floor((ms%60000)/1000)
-
-return m+"m "+s+"s"
+alert("All shunters reset")
 
 }
 
-function loadRecords(){
+function resetPower(){
 
-let filter=document.getElementById("filter").value
+db.ref("powerConnections").remove()
 
-let now=Date.now()
+alert("Power connections cleared")
 
-db.ref("tasks").once("value",snap=>{
+}
 
-let records=[]
+/* LOAD COMPLETED JOBS */
+
+db.ref("tasks").on("value",snap=>{
+
+let div=document.getElementById("completed")
+
+div.innerHTML=""
 
 snap.forEach(child=>{
 
 let t=child.val()
 
-if(t.status==="completed"){
-
-if(filter!=="all"){
-
-let days=filter*86400000
-
-if(now-t.completedTime>days) return
-
-}
-
-records.push(t)
-
-}
-
-})
-
-records.sort((a,b)=>(b.completedTime||0)-(a.completedTime||0))
-
-const div=document.getElementById("records")
-
-div.innerHTML=""
-
-records.forEach(t=>{
-
-let wait=t.acceptedTime - t.created
-
-let duration=t.completedTime - t.acceptedTime
+if(t.status!=="completed") return
 
 let row=document.createElement("div")
 
-row.className="adminRow"
+row.className="managerRow"
 
 row.innerHTML=`
 
-<div>${t.trailer||""}</div>
-<div>${t.type||""}</div>
+<div>${t.trailer}</div>
+<div>${t.type}</div>
 <div>${t.from||""}</div>
 <div>${t.to||t.bay||""}</div>
 <div>${t.loadType||""}</div>
-<div>${t.requestedBy||""}</div>
-<div>${t.acceptedBy||""}</div>
-<div>${formatTime(t.created)}</div>
-<div>${formatTime(t.acceptedTime)}</div>
-<div>${formatTime(t.completedTime)}</div>
-<div>${formatDuration(wait)}</div>
-<div>${formatDuration(duration)}</div>
+<div>${new Date(t.created).toLocaleTimeString()}</div>
+<div>${new Date(t.acceptedTime||0).toLocaleTimeString()}</div>
+<div>${new Date(t.completedTime||0).toLocaleTimeString()}</div>
 
 `
 
@@ -161,109 +120,6 @@ div.appendChild(row)
 
 })
 
-}
-
-function resetShunters(){
-
-if(!confirm("Reset all shunters?")) return
-
-db.ref("shunters").remove()
-
-}
-
-function resetPower(){
-
-if(!confirm("Reset all power connections?")) return
-
-db.ref("powerConnections").remove()
-
-}
-
-function clearStuck(){
-
-db.ref("tasks").once("value",snap=>{
-
-snap.forEach(child=>{
-
-let t=child.val()
-
-if(t.status==="accepted" && !t.acceptedBy){
-
-db.ref("tasks/"+child.key).update({status:"waiting"})
-
-}
-
-})
-
-})
-
-}
-
-function deleteCompleted(){
-
-if(!confirm("Delete completed tasks?")) return
-
-db.ref("tasks").once("value",snap=>{
-
-snap.forEach(child=>{
-
-let t=child.val()
-
-if(t.status==="completed"){
-
-db.ref("tasks/"+child.key).remove()
-
-}
-
-})
-
-})
-
-}
-
-function downloadCSV(){
-
-db.ref("tasks").once("value",snap=>{
-
-let rows=[]
-
-rows.push("Trailer,Job,From,To,Load,Supervisor,Shunter,Requested,Accepted,Completed")
-
-snap.forEach(child=>{
-
-let t=child.val()
-
-if(t.status==="completed"){
-
-rows.push(
-
-`${t.trailer},${t.type},${t.from},${t.to||t.bay},${t.loadType},${t.requestedBy},${t.acceptedBy},${t.created},${t.acceptedTime},${t.completedTime}`
-
-)
-
-}
-
-})
-
-let blob=new Blob([rows.join("\n")],{type:"text/csv"})
-
-let a=document.createElement("a")
-
-a.href=URL.createObjectURL(blob)
-
-a.download="shunt-records.csv"
-
-a.click()
-
-})
-
-}
-
-loadRecords()
-
-</script>
-
-
 </script>
 
 <div class="footer">
@@ -271,9 +127,5 @@ Shunt Queue System<br>
 © Lee Powell 2026
 </div>
 
-</body>
-</html>
-
-  
 </body>
 </html>
