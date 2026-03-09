@@ -103,21 +103,6 @@ Gatehouse Priority
 
 <script>
 
-function requireLogin(){
-
-const name=localStorage.getItem("userName")
-const role=localStorage.getItem("userRole")
-
-if(!name || role!=="Manager"){
-window.location.href="manager-login.html"
-return false
-}
-
-document.getElementById("who").innerHTML="Logged in as "+name
-
-return true
-}
-
 function logout(){
 localStorage.clear()
 window.location.href="index.html"
@@ -152,11 +137,9 @@ bay.appendChild(o)
 
 }
 
-if(requireLogin()){
-
 populateBays()
 
-/* QUEUE */
+/* ---------- QUEUE ---------- */
 
 db.ref("tasks").on("value",snap=>{
 
@@ -218,7 +201,7 @@ controls.appendChild(down)
 
 })
 
-/* SHUNTER STATUS */
+/* ---------- SHUNTER STATUS ---------- */
 
 db.ref("shunters").on("value",snap=>{
 
@@ -229,19 +212,21 @@ snap.forEach(child=>{
 
 const s=child.val()
 
+let icon="🟢"
+
+if(s.status==="moving") icon="🟡"
+if(s.status==="power") icon="🔵"
+if(s.status==="break") icon="🔴"
+
 let row=document.createElement("div")
 
-row.innerHTML=`
-<b>${child.key}</b> — ${s.status}
-`
+row.innerHTML=`<b>${child.key}</b> (${s.driver}) ${icon} ${s.status}`
 
 div.appendChild(row)
 
 })
 
 })
-
-}
 
 </script>
 
