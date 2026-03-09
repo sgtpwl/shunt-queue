@@ -1,270 +1,106 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Manager - Shunt Queue</title>
+  <title>Shunter Login</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="style.css">
-  <style>
-    .stat{ font-size:22px; margin:5px 0; }
-  </style>
 </head>
 <body>
 
-<h1>Manager</h1>
+<h1>Shunter Login</h1>
 
-<div id="who"></div>
-<button onclick="logout()">Logout</button>
+<label>Vehicle</label><br>
 
-<hr>
+<select id="vehicle">
+<option value="">Select vehicle</option>
 
-<h2>Yard Status</h2>
-<div class="stat">Queue Length: <span id="queue">0</span></div>
-<div class="stat">Priority Jobs: <span id="priority">0</span></div>
-<div class="stat">Active Jobs: <span id="active">0</span></div>
-<div class="stat">Shunters Available: <span id="available">0</span></div>
-<div class="stat">On Break: <span id="break">0</span></div>
-<div class="stat">Power Connections: <span id="power">0</span></div>
+<option value="OZS">OZS</option>
+<option value="MYJ">MYJ</option>
+<option value="XSH">XSH</option>
+<option value="TZK">TZK</option>
+<option value="SPARE">SPARE</option>
 
-<hr>
-
-<h2>Create Task</h2>
-
-<select id="taskType" onchange="toggleTaskInputs()">
-  <option value="move">Move Trailer</option>
-  <option value="power">Provide Power (DD)</option>
 </select>
 
 <br><br>
 
-<label>
-  <input type="checkbox" id="priority">
-  Gatehouse Priority
-</label>
+<label>Driver name</label><br>
+<input id="driver" placeholder="Driver name">
 
 <br><br>
 
-<div id="moveFields">
-  <input id="trailer" placeholder="Trailer Number">
-  <input id="from" placeholder="From Location">
-  <input id="to" placeholder="To Location">
-  <br><br>
-  <select id="loadType">
-    <option value="Full Load">Full Load</option>
-    <option value="Empty Trailer">Empty Trailer</option>
-    <option value="Trunk Trailer" selected>Trunk Trailer</option>
-  </select>
-</div>
+<button id="loginBtn" onclick="login()">Login</button>
 
-<div id="powerFields" style="display:none">
-  <input id="powerTrailer" placeholder="Trailer Number">
-  <br><br>
-  <select id="bay">
-    <option value="">Select Bay</option>
-  </select>
-</div>
-
-<br><br>
-
-<button onclick="addTask(this)">Submit Task</button>
 <p id="msg"></p>
-
-<hr>
-
-<h2>Active Power</h2>
-<div id="powerConnections"></div>
-
-<hr>
-
-<h2>Queue</h2>
-<div id="tasks"></div>
-
-<hr>
-
-<h2>Shunters</h2>
-<div id="shunters"></div>
-
-<script>
-function requireLogin(){
-  const name = localStorage.getItem("userName");
-  const role = localStorage.getItem("userRole");
-  if(!name || role !== "Manager"){
-    window.location.href = "manager-login.html";
-    return false;
-  }
-  document.getElementById("who").innerHTML = "Logged in as: <b>" + name + "</b> (Manager)";
-  return true;
-}
-
-function logout(){
-  localStorage.removeItem("userName");
-  localStorage.removeItem("userRole");
-  window.location.href = "index.html";
-}
-
-function toggleTaskInputs(){
-  const type = document.getElementById("taskType").value;
-  document.getElementById("moveFields").style.display = (type==="move") ? "block" : "none";
-  document.getElementById("powerFields").style.display = (type==="power") ? "block" : "none";
-}
-
-function populateBays(){
-  const baySelect = document.getElementById("bay");
-
-  for(let i=1;i<=25;i++){
-    const opt=document.createElement("option");
-    opt.value="B"+i;
-    opt.innerText="B"+i;
-    baySelect.appendChild(opt);
-  }
-
-  for(let i=1;i<=26;i++){
-    const opt=document.createElement("option");
-    opt.value="C"+i;
-    opt.innerText="C"+i;
-    baySelect.appendChild(opt);
-  }
-}
-</script>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script src="config.js"></script>
-<script src="app.js"></script>
 
 <script>
-if(requireLogin()){
-  populateBays();
 
-  // TASKS: DASHBOARD + QUEUE (HIDE COMPLETED)
-  db.ref("tasks").on("value", snap => {
+function login(){
 
-    let all=[];
-    snap.forEach(child=>{
-      let t=child.val() || {};
-      t.id=child.key;
-      all.push(t);
-    });
+const btn=document.getElementById("loginBtn")
 
-    all.sort((a,b)=>(a.position||0)-(b.position||0));
+btn.disabled=true
+btn.innerText="Logging in..."
 
-    // Only show active tasks in queue
-    const tasks = all.filter(t => t.status !== "completed");
+const vehicle=document.getElementById("vehicle").value
+const driver=document.getElementById("driver").value
 
-    // stats should reflect active state only
-    document.getElementById("queue").innerText = tasks.filter(t=>t.status==="waiting").length;
-    document.getElementById("priority").innerText = tasks.filter(t=>t.status==="waiting" && t.priority).length;
-    document.getElementById("active").innerText = tasks.filter(t=>t.status==="accepted").length;
+if(!vehicle || !driver){
 
-    // render queue
-    const div=document.getElementById("tasks");
-    div.innerHTML="";
+alert("Select vehicle and enter driver")
 
-    tasks.forEach((t, idx)=>{
+btn.disabled=false
+btn.innerText="Login"
 
-      const row=document.createElement("div");
-      row.className="task";
+return
 
-      const pri = t.priority ? "⚠ PRIORITY<br>" : "";
-      const requester = t.requestedBy
-        ? ("Requested by: " + t.requestedBy + " (" + (t.requestedRole||"") + ")")
-        : "Requested by: Unknown";
-
-      const loc = (t.type==="Move Trailer")
-        ? `${t.from||""} → ${t.to||""}<br>${(t.loadType||"").toUpperCase()}`
-        : `Bay ${t.bay||""}`;
-
-      let html = `
-        <b>${idx+1}. ${t.trailer||""}</b><br>
-        ${pri}
-        ${t.type||""}<br>
-        ${loc}<br>
-        ${requester}<br>
-        Status: ${t.status||""}
-      `;
-
-      if(t.status==="accepted"){
-        html += `<br>Accepted: ${t.acceptedBy||""} (${t.driver||""})`;
-      }
-
-      row.innerHTML = html;
-
-      // reorder buttons: waiting only, idx >= 4
-      if(t.status==="waiting" && idx>=4){
-        const up=document.createElement("button");
-        up.innerText="▲";
-        up.onclick=()=>moveUp(t.id);
-
-        const down=document.createElement("button");
-        down.innerText="▼";
-        down.onclick=()=>moveDown(t.id);
-
-        row.appendChild(up);
-        row.appendChild(down);
-      }
-
-      // delete: waiting only
-      if(t.status==="waiting"){
-        const del=document.createElement("button");
-        del.innerText="Delete";
-        del.onclick=()=>deleteTask(t.id);
-        row.appendChild(del);
-      }
-
-      div.appendChild(row);
-    });
-
-  });
-
-  // SHUNTERS
-  db.ref("shunters").on("value", snap => {
-
-    let available=0;
-    let br=0;
-
-    const div=document.getElementById("shunters");
-    div.innerHTML="";
-
-    snap.forEach(child=>{
-      const s=child.val() || {};
-      const row=document.createElement("div");
-      row.className="task";
-      row.innerHTML = `<b>${child.key}</b><br>Driver: ${s.driver||""}<br>Status: ${s.status||""}`;
-      div.appendChild(row);
-
-      if(s.status==="available") available++;
-      if(s.status==="break") br++;
-    });
-
-    document.getElementById("available").innerText = available;
-    document.getElementById("break").innerText = br;
-
-  });
-
-  // POWER
-  db.ref("powerConnections").on("value", snap => {
-
-    const div=document.getElementById("powerConnections");
-    div.innerHTML="";
-
-    let count=0;
-
-    snap.forEach(child=>{
-      count++;
-      const p=child.val() || {};
-      const row=document.createElement("div");
-      row.className="task";
-      row.innerHTML = `<b>${child.key}</b> powering Bay ${p.bay||""}<br>`;
-      const btn=document.createElement("button");
-      btn.innerText="Finish Power";
-      btn.onclick=()=>finishPower(child.key, btn);
-      row.appendChild(btn);
-      div.appendChild(row);
-    });
-
-    document.getElementById("power").innerText = count;
-
-  });
 }
+
+const ref=db.ref("shunters/"+vehicle)
+
+ref.transaction(current=>{
+
+if(current && current.isLoggedIn){
+
+return
+
+}
+
+return{
+
+driver:driver,
+status:"available",
+isLoggedIn:true,
+loginTime:Date.now()
+
+}
+
+},(error,committed)=>{
+
+if(!committed){
+
+alert(vehicle+" already logged in")
+
+btn.disabled=false
+btn.innerText="Login"
+
+return
+
+}
+
+localStorage.setItem("vehicle",vehicle)
+localStorage.setItem("driver",driver)
+
+window.location.href="shunter.html"
+
+})
+
+}
+
 </script>
 
 </body>
