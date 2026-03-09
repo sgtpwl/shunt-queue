@@ -28,7 +28,7 @@
 
 <h2>Create Task</h2>
 
-<select id="taskType" onchange="toggleTaskInputs()">
+<select id="taskType">
 <option value="move">Move Trailer</option>
 <option value="power">Provide Power (DD)</option>
 </select>
@@ -42,8 +42,6 @@ Gatehouse Priority
 
 <br><br>
 
-<div id="moveFields">
-
 <input id="trailer" placeholder="Trailer Number">
 <input id="from" placeholder="From Location">
 <input id="to" placeholder="To Location">
@@ -55,8 +53,6 @@ Gatehouse Priority
 <option value="Empty Trailer">Empty Trailer</option>
 <option value="Trunk Trailer">Trunk Trailer</option>
 </select>
-
-</div>
 
 <br><br>
 
@@ -76,29 +72,12 @@ Gatehouse Priority
 
 <script>
 
-function requireLogin(){
-
-const name=localStorage.getItem("userName")
-const role=localStorage.getItem("userRole")
-
-if(!name || role!=="Supervisor"){
-window.location.href="supervisor-login.html"
-return false
-}
-
-document.getElementById("who").innerHTML="Logged in as "+name
-
-return true
-}
-
 function logout(){
 localStorage.clear()
 window.location.href="index.html"
 }
 
-if(requireLogin()){
-
-/* QUEUE */
+/* ---------- QUEUE ---------- */
 
 db.ref("tasks").on("value",snap=>{
 
@@ -110,7 +89,7 @@ t.id=child.key
 all.push(t)
 })
 
-all.sort((a,b)=>a.position-b.position)
+all.sort((a,b)=>(a.position||0)-(b.position||0))
 
 const tasks=all.filter(t=>t.status!=="completed")
 
@@ -122,7 +101,7 @@ tasks.forEach((t,i)=>{
 let row=document.createElement("div")
 
 row.style.borderBottom="1px solid #333"
-row.style.padding="8px"
+row.style.padding="10px"
 
 row.innerHTML=`
 
@@ -156,7 +135,7 @@ div.appendChild(row)
 
 })
 
-/* SHUNTER STATUS */
+/* ---------- SHUNTER STATUS ---------- */
 
 db.ref("shunters").on("value",snap=>{
 
@@ -167,19 +146,21 @@ snap.forEach(child=>{
 
 const s=child.val()
 
+let icon="🟢"
+
+if(s.status==="moving") icon="🟡"
+if(s.status==="power") icon="🔵"
+if(s.status==="break") icon="🔴"
+
 let row=document.createElement("div")
 
-row.innerHTML=`
-<b>${child.key}</b> — ${s.status}
-`
+row.innerHTML=`<b>${child.key}</b> (${s.driver}) ${icon} ${s.status}`
 
 div.appendChild(row)
 
 })
 
 })
-
-}
 
 </script>
 
