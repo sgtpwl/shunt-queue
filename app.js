@@ -57,6 +57,7 @@ button.innerText="Submit Task"
 
 }
 
+
 /* ---------------- MOVE QUEUE ---------------- */
 
 function moveUp(id){
@@ -119,6 +120,7 @@ db.ref("tasks/"+below.id+"/position").set(current.position)
 
 }
 
+
 /* ---------------- SHUNTER HEARTBEAT ---------------- */
 
 function startHeartbeat(vehicle){
@@ -130,6 +132,7 @@ db.ref("shunters/"+vehicle+"/lastSeen").set(Date.now())
 },10000)
 
 }
+
 
 /* ---------------- OFFLINE WATCHDOG ---------------- */
 
@@ -156,3 +159,77 @@ db.ref("shunters/"+child.key+"/status").set("offline")
 })
 
 },30000)
+
+
+/* ---------------- LIVE SHUNTER STATUS ---------------- */
+
+function loadShunterStatus(){
+
+db.ref("shunters").on("value",snap=>{
+
+const div=document.getElementById("shunterStatus")
+
+if(!div) return
+
+div.innerHTML=""
+
+snap.forEach(child=>{
+
+let s=child.val()
+
+let vehicle=child.key
+let driver=s.driver || ""
+let status=s.status || "available"
+
+let icon="🟢"
+let text="Available"
+
+if(status==="offline"){
+icon="⚫"
+text="Offline"
+}
+
+if(status==="break"){
+icon="🔴"
+text="Break"
+}
+
+let row=document.createElement("div")
+
+row.innerHTML=`<b>${vehicle}</b> (${driver}) ${icon} ${text}`
+
+div.appendChild(row)
+
+})
+
+})
+
+/* now overlay active jobs */
+
+db.ref("tasks").on("value",snap=>{
+
+snap.forEach(child=>{
+
+let t=child.val()
+
+if(t.status==="accepted"){
+
+let shunter=t.acceptedBy
+
+let row=document.querySelector(`#shunterStatus div[data-vehicle='${shunter}']`)
+
+if(row){
+
+row.innerHTML=`<b>${shunter}</b> (${t.acceptedByDriver}) 🟡 Moving Trailer ${t.trailer}`
+
+}
+
+}
+
+})
+
+})
+
+}
+
+loadShunterStatus()
