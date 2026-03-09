@@ -1,4 +1,4 @@
-const db = firebase.database()
+var db = firebase.database()
 
 /* ---------------- ADD TASK ---------------- */
 
@@ -215,3 +215,4 @@ db.ref("shunters/"+child.key+"/status").set("offline")
 })
 
 },30000)
+
