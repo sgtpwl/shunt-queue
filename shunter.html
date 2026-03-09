@@ -1,8 +1,12 @@
 <!DOCTYPE html>
 <html>
+
 <head>
 
 <title>Shunter</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <link rel="stylesheet" href="style.css">
 
 </head>
@@ -12,18 +16,6 @@
 <div class="container">
 
 <h1>Shunter</h1>
-
-<div class="instructions">
-
-<b>Instructions</b>
-
-<ul>
-<li>If you login and someone else's name appears, click End Shift and log back in.</li>
-<li>Wait for power completion confirmation on the radio before completing a Power DD job.</li>
-<li>Only complete jobs once the move is fully finished.</li>
-</ul>
-
-</div>
 
 <div id="loginBox">
 
@@ -41,82 +33,295 @@
 
 </div>
 
+
 <div id="mainScreen" style="display:none">
 
 <h2 id="vehicleTitle"></h2>
 
-<div id="taskCard"></div>
+<div id="taskCard" class="taskCard"></div>
 
 <div class="shunterButtons">
 
 <button onclick="startBreak()">Break</button>
+
 <button onclick="endBreak()">End Break</button>
+
 <button onclick="endShift()">End Shift</button>
 
 </div>
 
 </div>
 
+
+<div class="instructions">
+
+<b>Instructions</b>
+
+<ul>
+
+<li>If you login and someone else's name appears, click <b>End Shift</b> and log back in again.</li>
+
+<li>Wait for power completion confirmation over the radio before completing a <b>Power DD</b> job.</li>
+
+<li>Only complete jobs once the move has fully finished.</li>
+
+</ul>
+
 </div>
 
+</div>
+
+
+
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <script src="config.js"></script>
+
 <script src="app.js"></script>
+
+
 
 <script>
 
 let vehicle = localStorage.getItem("vehicle")
+
 let driver = localStorage.getItem("driver")
+
 
 if(vehicle){
 
 document.getElementById("loginBox").style.display="none"
+
 document.getElementById("mainScreen").style.display="block"
 
 document.getElementById("vehicleTitle").innerText = vehicle+" ("+driver+")"
 
-logActivity("LOGIN")
-
 watchTasks()
 
 }
+
 
 function loginShunter(){
 
 vehicle = document.getElementById("vehicle").value
+
 driver = document.getElementById("driverName").value
 
+
+if(driver==""){
+
+alert("Enter driver name")
+
+return
+
+}
+
+
 localStorage.setItem("vehicle",vehicle)
+
 localStorage.setItem("driver",driver)
+
 
 db.ref("shunters/"+vehicle).set({
 
 vehicle:vehicle,
+
 driver:driver,
+
 status:"available"
 
 })
 
-logActivity("LOGIN")
 
 document.getElementById("loginBox").style.display="none"
+
 document.getElementById("mainScreen").style.display="block"
 
+
 document.getElementById("vehicleTitle").innerText = vehicle+" ("+driver+")"
+
 
 watchTasks()
 
 }
 
-function endShift(){
 
-logActivity("LOGOUT")
+
+function watchTasks(){
+
+db.ref("tasks").on("value",snapshot=>{
+
+let tasks=[]
+
+
+snapshot.forEach(child=>{
+
+let t = child.val()
+
+t.id = child.key
+
+
+if(t.status!="completed"){
+
+tasks.push(t)
+
+}
+
+})
+
+
+tasks.sort((a,b)=>a.position-b.position)
+
+
+let myTask = tasks.find(t=>t.acceptedBy==vehicle)
+
+
+if(myTask){
+
+renderMyTask(myTask)
+
+return
+
+}
+
+
+let nextTask = tasks.find(t=>!t.acceptedBy && t.status=="waiting")
+
+
+if(nextTask){
+
+renderNextTask(nextTask)
+
+}
+
+else{
+
+document.getElementById("taskCard").innerHTML="<h2>No tasks waiting</h2>"
+
+}
+
+})
+
+}
+
+
+
+function renderMyTask(task){
+
+let html=""
+
+
+html+="<h2>Current Task</h2>"
+
+html+="<div class='taskBox'>"
+
+
+html+="<b>Trailer:</b> "+task.trailer+"<br>"
+
+html+="<b>Job:</b> "+task.type+"<br>"
+
+
+if(task.from && task.to){
+
+html+="<b>From:</b> "+task.from+"<br>"
+
+html+="<b>To:</b> "+task.to+"<br>"
+
+}
+
+
+if(task.bay){
+
+html+="<b>Bay:</b> "+task.bay+"<br>"
+
+}
+
+
+html+="<b>Load:</b> "+task.loadType+"<br><br>"
+
+
+html+="<button onclick='completeTask(\""+task.id+"\")'>Complete Task</button>"
+
+
+html+="</div>"
+
+
+document.getElementById("taskCard").innerHTML=html
+
+}
+
+
+
+function renderNextTask(task){
+
+let html=""
+
+
+html+="<h2>Next Task</h2>"
+
+html+="<div class='taskBox'>"
+
+
+html+="<b>Trailer:</b> "+task.trailer+"<br>"
+
+html+="<b>Job:</b> "+task.type+"<br>"
+
+
+if(task.from && task.to){
+
+html+="<b>From:</b> "+task.from+"<br>"
+
+html+="<b>To:</b> "+task.to+"<br>"
+
+}
+
+
+if(task.bay){
+
+html+="<b>Bay:</b> "+task.bay+"<br>"
+
+}
+
+
+html+="<b>Load:</b> "+task.loadType+"<br><br>"
+
+
+html+="<button onclick='acceptTask(\""+task.id+"\")'>Accept Task</button>"
+
+
+html+="</div>"
+
+
+document.getElementById("taskCard").innerHTML=html
+
+}
+
+
+
+function startBreak(){
+
+db.ref("shunters/"+vehicle+"/status").set("break")
+
+}
+
+
+
+function endBreak(){
+
+db.ref("shunters/"+vehicle+"/status").set("available")
+
+}
+
+
+
+function endShift(){
 
 db.ref("shunters/"+vehicle).remove()
 
 localStorage.removeItem("vehicle")
+
 localStorage.removeItem("driver")
 
 location.reload()
@@ -125,5 +330,7 @@ location.reload()
 
 </script>
 
+
 </body>
+
 </html>
