@@ -2,7 +2,7 @@
 <html>
 <head>
 
-<title>Admin - Completed Jobs</title>
+<title>Admin Panel</title>
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -12,9 +12,36 @@
 
 <body>
 
-<h1>Completed Job Records</h1>
+<h1>Admin Panel</h1>
 
-<div class="queueHeader">
+<h2>System Tools</h2>
+
+<button onclick="resetShunters()">Reset Shunters</button>
+
+<button onclick="resetPower()">Reset Power Connections</button>
+
+<button onclick="clearStuck()">Clear Stuck Tasks</button>
+
+<button onclick="deleteCompleted()">Delete Completed Tasks</button>
+
+<button onclick="downloadCSV()">Download CSV</button>
+
+<hr>
+
+<h2>Completed Job Records</h2>
+
+<label>Filter:</label>
+
+<select id="filter" onchange="loadRecords()">
+<option value="1">Today</option>
+<option value="7">Last 7 Days</option>
+<option value="30">Last 30 Days</option>
+<option value="all">All</option>
+</select>
+
+<br><br>
+
+<div class="adminHeader">
 
 <div>Trailer</div>
 <div>Job</div>
@@ -57,15 +84,21 @@ function formatDuration(ms){
 
 if(!ms) return ""
 
-let minutes=Math.floor(ms/60000)
+let m=Math.floor(ms/60000)
 
-let seconds=Math.floor((ms%60000)/1000)
+let s=Math.floor((ms%60000)/1000)
 
-return minutes+"m "+seconds+"s"
+return m+"m "+s+"s"
 
 }
 
-db.ref("tasks").on("value",snap=>{
+function loadRecords(){
+
+let filter=document.getElementById("filter").value
+
+let now=Date.now()
+
+db.ref("tasks").once("value",snap=>{
 
 let records=[]
 
@@ -74,6 +107,14 @@ snap.forEach(child=>{
 let t=child.val()
 
 if(t.status==="completed"){
+
+if(filter!=="all"){
+
+let days=filter*86400000
+
+if(now-t.completedTime>days) return
+
+}
 
 records.push(t)
 
@@ -95,32 +136,21 @@ let duration=t.completedTime - t.acceptedTime
 
 let row=document.createElement("div")
 
-row.className="task"
+row.className="adminRow"
 
 row.innerHTML=`
 
 <div>${t.trailer||""}</div>
-
 <div>${t.type||""}</div>
-
 <div>${t.from||""}</div>
-
 <div>${t.to||t.bay||""}</div>
-
 <div>${t.loadType||""}</div>
-
 <div>${t.requestedBy||""}</div>
-
 <div>${t.acceptedBy||""}</div>
-
 <div>${formatTime(t.created)}</div>
-
 <div>${formatTime(t.acceptedTime)}</div>
-
 <div>${formatTime(t.completedTime)}</div>
-
 <div>${formatDuration(wait)}</div>
-
 <div>${formatDuration(duration)}</div>
 
 `
@@ -130,6 +160,106 @@ div.appendChild(row)
 })
 
 })
+
+}
+
+function resetShunters(){
+
+if(!confirm("Reset all shunters?")) return
+
+db.ref("shunters").remove()
+
+}
+
+function resetPower(){
+
+if(!confirm("Reset all power connections?")) return
+
+db.ref("powerConnections").remove()
+
+}
+
+function clearStuck(){
+
+db.ref("tasks").once("value",snap=>{
+
+snap.forEach(child=>{
+
+let t=child.val()
+
+if(t.status==="accepted" && !t.acceptedBy){
+
+db.ref("tasks/"+child.key).update({status:"waiting"})
+
+}
+
+})
+
+})
+
+}
+
+function deleteCompleted(){
+
+if(!confirm("Delete completed tasks?")) return
+
+db.ref("tasks").once("value",snap=>{
+
+snap.forEach(child=>{
+
+let t=child.val()
+
+if(t.status==="completed"){
+
+db.ref("tasks/"+child.key).remove()
+
+}
+
+})
+
+})
+
+}
+
+function downloadCSV(){
+
+db.ref("tasks").once("value",snap=>{
+
+let rows=[]
+
+rows.push("Trailer,Job,From,To,Load,Supervisor,Shunter,Requested,Accepted,Completed")
+
+snap.forEach(child=>{
+
+let t=child.val()
+
+if(t.status==="completed"){
+
+rows.push(
+
+`${t.trailer},${t.type},${t.from},${t.to||t.bay},${t.loadType},${t.requestedBy},${t.acceptedBy},${t.created},${t.acceptedTime},${t.completedTime}`
+
+)
+
+}
+
+})
+
+let blob=new Blob([rows.join("\n")],{type:"text/csv"})
+
+let a=document.createElement("a")
+
+a.href=URL.createObjectURL(blob)
+
+a.download="shunt-records.csv"
+
+a.click()
+
+})
+
+}
+
+loadRecords()
 
 </script>
 
