@@ -1,136 +1,63 @@
-function currentUser(){
-return {
-name: localStorage.getItem("userName") || "Unknown",
-role: localStorage.getItem("userRole") || "unknown"
-}
-}
+const db = firebase.database()
 
-/* ---------- ADD TASK ---------- */
+/* ---------------- ADD TASK ---------------- */
 
-let lastSubmitTime = 0
+function addTask(button){
 
-function addTask(btn){
-
-let now = Date.now()
-
-if(now - lastSubmitTime < 3000){
-alert("Please wait a moment before adding another task")
-return
-}
-
-lastSubmitTime = now
-
-btn.disabled=true
-btn.innerText="Submitting..."
-
-let user=currentUser()
-
-let type=document.getElementById("taskType").value
-
-let trailer=""
-let from=""
-let to=""
-let bay=""
+let trailer=document.getElementById("trailer")?.value || ""
+let from=document.getElementById("from")?.value || ""
+let to=document.getElementById("to")?.value || ""
 let loadType=document.getElementById("loadType")?.value || ""
-let priority=document.getElementById("priority")?.checked || false
+let bay=document.getElementById("bay")?.value || ""
+let type=document.getElementById("taskType")?.value || "move"
 
-if(type==="move"){
-
-trailer=document.getElementById("trailer").value.trim()
-from=document.getElementById("from").value
-to=document.getElementById("to").value
-
-}else{
-
-trailer=document.getElementById("powerTrailer").value.trim()
-bay=document.getElementById("bay").value
-
-}
+let requestedBy=localStorage.getItem("userName") || "unknown"
 
 if(!trailer){
 
 alert("Enter trailer number")
-
-btn.disabled=false
-btn.innerText="Submit Task"
-
 return
 
 }
 
+button.disabled=true
+button.innerText="Submitting..."
+
 db.ref("tasks").once("value",snap=>{
 
-let tasks=[]
-snap.forEach(child=>{
-let t=child.val()
-t.id=child.key
-tasks.push(t)
-})
-
-tasks.sort((a,b)=>a.position-b.position)
-
-let lastAccepted=0
-
-tasks.forEach(t=>{
-if(t.status==="accepted"){
-lastAccepted=Math.max(lastAccepted,t.position)
-}
-})
-
-let newPosition
-
-if(priority){
-
-newPosition=lastAccepted+1
-
-tasks.forEach(t=>{
-if(t.position>=newPosition){
-db.ref("tasks/"+t.id+"/position").set(t.position+1)
-}
-})
-
-}else{
-
-let max=0
-tasks.forEach(t=>{
-max=Math.max(max,t.position)
-})
-
-newPosition=max+1
-
-}
+let position=snap.numChildren()+1
 
 db.ref("tasks").push({
 
-type:type==="move"?"Move Trailer":"Provide Power (DD)",
-trailer:trailer,
-from:from,
-to:to,
-bay:bay,
-loadType:loadType,
-priority:priority,
-requestedBy:user.name,
-requestedRole:user.role,
+trailer,
+from,
+to,
+bay,
+loadType,
+type,
+requestedBy,
 status:"waiting",
-created:Date.now(),
-position:newPosition
+position,
+created:Date.now()
 
-})
+}).then(()=>{
 
-btn.innerText="Task Added ✓"
+button.innerText="Task Added ✓"
 
 setTimeout(()=>{
 
-btn.disabled=false
-btn.innerText="Submit Task"
+button.disabled=false
+button.innerText="Submit Task"
 
-},3000)
+},5000)
+
+})
 
 })
 
 }
 
-/* ---------- MOVE QUEUE ---------- */
+/* ---------------- MOVE QUEUE ---------------- */
 
 function moveUp(id){
 
@@ -139,24 +66,24 @@ db.ref("tasks").once("value",snap=>{
 let tasks=[]
 
 snap.forEach(child=>{
+
 let t=child.val()
 t.id=child.key
 tasks.push(t)
+
 })
 
 tasks.sort((a,b)=>a.position-b.position)
 
 let index=tasks.findIndex(t=>t.id===id)
 
-if(index<=3) return
+if(index<=0) return
 
+let current=tasks[index]
 let above=tasks[index-1]
 
-if(tasks[index].status!=="waiting") return
-if(above.status!=="waiting") return
-
-db.ref("tasks/"+id+"/position").set(above.position)
-db.ref("tasks/"+above.id+"/position").set(tasks[index].position)
+db.ref("tasks/"+current.id+"/position").set(above.position)
+db.ref("tasks/"+above.id+"/position").set(current.position)
 
 })
 
@@ -169,133 +96,58 @@ db.ref("tasks").once("value",snap=>{
 let tasks=[]
 
 snap.forEach(child=>{
+
 let t=child.val()
 t.id=child.key
 tasks.push(t)
+
 })
 
 tasks.sort((a,b)=>a.position-b.position)
 
 let index=tasks.findIndex(t=>t.id===id)
 
-if(index<4) return
 if(index===tasks.length-1) return
 
+let current=tasks[index]
 let below=tasks[index+1]
 
-if(tasks[index].status!=="waiting") return
-if(below.status!=="waiting") return
-
-db.ref("tasks/"+id+"/position").set(below.position)
-db.ref("tasks/"+below.id+"/position").set(tasks[index].position)
+db.ref("tasks/"+current.id+"/position").set(below.position)
+db.ref("tasks/"+below.id+"/position").set(current.position)
 
 })
 
 }
 
-/* ---------- DELETE TASK ---------- */
+/* ---------------- SHUNTER HEARTBEAT ---------------- */
 
-function deleteTask(id){
+function startHeartbeat(vehicle){
 
-if(!confirm("Delete task?")) return
+setInterval(()=>{
 
-db.ref("tasks/"+id).remove()
+db.ref("shunters/"+vehicle+"/lastSeen").set(Date.now())
 
-}
-
-/* ---------- ACCEPT TASK ---------- */
-
-function acceptTask(id){
-
-let vehicle=localStorage.getItem("vehicle")
-let driver=localStorage.getItem("driver")
-
-db.ref("tasks/"+id).transaction(task=>{
-
-if(task===null) return task
-if(task.status!=="waiting") return
-
-task.status="accepted"
-task.acceptedBy=vehicle
-task.driver=driver
-task.acceptedTime=Date.now()
-
-return task
-
-})
+},10000)
 
 }
 
-/* ---------- COMPLETE TASK ---------- */
+/* ---------------- OFFLINE WATCHDOG ---------------- */
 
-function completeTask(id){
+setInterval(()=>{
 
-let vehicle=localStorage.getItem("vehicle")
-
-db.ref("tasks/"+id).update({
-
-status:"completed",
-completedTime:Date.now()
-
-})
-
-db.ref("shunters/"+vehicle).update({
-
-status:"available"
-
-})
-
-}
-
-/* ---------- GATEHOUSE NOTIFY ---------- */
-
-function notifyGatehouse(id){
-
-db.ref("tasks/"+id).update({
-
-gatehouseNotified:true,
-gatehouseTime:Date.now()
-
-})
-
-}
-
-/* ---------- FINISH POWER ---------- */
-
-function finishPower(vehicle){
-
-db.ref("powerConnections/"+vehicle).remove()
-
-}
-
-/* ---------- SAFETY TIMER ---------- */
-
-function safetyCheck(){
-
-const limit=15*60*1000
-
-db.ref("tasks").once("value",snap=>{
+db.ref("shunters").once("value",snap=>{
 
 snap.forEach(child=>{
 
-let t=child.val()
+let s=child.val()
 
-if(t.status==="accepted"){
+if(!s.lastSeen) return
 
-let now=Date.now()
+let diff=Date.now()-s.lastSeen
 
-if(now-t.acceptedTime>limit){
+if(diff>60000){
 
-db.ref("tasks/"+child.key).update({
-
-status:"waiting",
-acceptedBy:null,
-driver:null,
-acceptedTime:null
-
-})
-
-}
+db.ref("shunters/"+child.key+"/status").set("offline")
 
 }
 
@@ -303,6 +155,4 @@ acceptedTime:null
 
 })
 
-}
-
-setInterval(safetyCheck,60000)
+},30000)
