@@ -1,232 +1,113 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Admin Dashboard</title>
-<link rel="stylesheet" href="style.css">
+
+<title>Admin - Completed Jobs</title>
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="style.css">
+
 </head>
 
 <body>
 
-<h1>Admin Dashboard</h1>
+<h1>Completed Job Records</h1>
 
-<h2>System Tools</h2>
+<div class="queueHeader">
 
-<button onclick="resetShunters()">Reset Shunters</button>
-<button onclick="clearPower()">Clear Power Connections</button>
+<div>Trailer</div>
+<div>Job</div>
+<div>From</div>
+<div>To</div>
+<div>Load</div>
+<div>Supervisor</div>
+<div>Shunter</div>
+<div>Requested</div>
+<div>Accepted</div>
+<div>Completed</div>
 
-<h2>Live Yard Status</h2>
-<div id="yardStatus"></div>
+</div>
 
-<h2>Completed Tasks</h2>
-
-<select id="dateFilter" onchange="renderCompleted()">
-<option value="today">Today</option>
-<option value="7">Last 7 Days</option>
-<option value="30">Last 30 Days</option>
-<option value="all">All Time</option>
-</select>
-
-<div id="completedTasks"></div>
-
-<button onclick="downloadCSV()">Download CSV Report</button>
+<div id="records"></div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
 <script src="config.js"></script>
 
 <script>
 
-let tasksData=[];
-let powerData={};
-let shuntersData={};
+function formatTime(ts){
 
-function minutes(ms){
-return Math.floor(ms/60000);
+if(!ts) return ""
+
+const d=new Date(ts)
+
+return d.toLocaleTimeString([],{
+hour:'2-digit',
+minute:'2-digit'
+})
+
 }
-
-function loadAll(){
 
 db.ref("tasks").on("value",snap=>{
 
-tasksData=[];
+let records=[]
 
 snap.forEach(child=>{
-let t=child.val();
-t.id=child.key;
-tasksData.push(t);
-});
 
-renderCompleted();
+let t=child.val()
 
-});
+if(t.status==="completed"){
 
-db.ref("powerConnections").on("value",snap=>{
-
-powerData={};
-
-snap.forEach(child=>{
-powerData[child.key]=child.val();
-});
-
-renderYard();
-
-});
-
-db.ref("shunters").on("value",snap=>{
-
-shuntersData={};
-
-snap.forEach(child=>{
-shuntersData[child.key]=child.val();
-});
-
-renderYard();
-
-});
+records.push(t)
 
 }
 
-function renderYard(){
+})
 
-const div=document.getElementById("yardStatus");
-div.innerHTML="";
+records.sort((a,b)=>(b.completedTime||0)-(a.completedTime||0))
 
-Object.keys(shuntersData).forEach(v=>{
+const div=document.getElementById("records")
 
-let s=shuntersData[v];
+div.innerHTML=""
 
-let row=document.createElement("div");
-row.className="task";
+records.forEach(t=>{
 
-if(powerData[v] && powerData[v].status==="connected"){
+let row=document.createElement("div")
 
-row.innerHTML=`${v} ⚡ Power Bay ${powerData[v].bay}`;
-
-}else if(s.status==="break"){
-
-row.innerHTML=`${v} Break`;
-
-}else{
-
-row.innerHTML=`${v} Available`;
-
-}
-
-div.appendChild(row);
-
-});
-
-}
-
-function getDateLimit(){
-
-const filter=document.getElementById("dateFilter").value;
-
-const now=Date.now();
-
-if(filter==="today"){
-
-let start=new Date();
-start.setHours(0,0,0,0);
-return start.getTime();
-
-}
-
-if(filter==="7"){
-
-return now-(7*24*60*60*1000);
-
-}
-
-if(filter==="30"){
-
-return now-(30*24*60*60*1000);
-
-}
-
-return 0;
-
-}
-
-function renderCompleted(){
-
-const div=document.getElementById("completedTasks");
-div.innerHTML="";
-
-const limit=getDateLimit();
-
-tasksData
-.filter(t=>t.status==="completed")
-.filter(t=>t.completedTime>=limit)
-.sort((a,b)=>b.completedTime-a.completedTime)
-.forEach(t=>{
-
-let delay=minutes(t.acceptedTime-t.created);
-let dur=minutes(t.completedTime-t.acceptedTime);
-
-let row=document.createElement("div");
-row.className="task";
+row.className="task"
 
 row.innerHTML=`
-Trailer ${t.trailer}<br>
-Vehicle ${t.acceptedBy}<br>
-Driver ${t.driver}<br>
-Delay ${delay} min<br>
-Duration ${dur} min
-`;
 
-div.appendChild(row);
+<div>${t.trailer||""}</div>
 
-});
+<div>${t.type||""}</div>
 
-}
+<div>${t.from||""}</div>
 
-function downloadCSV(){
+<div>${t.to||t.bay||""}</div>
 
-let csv="Trailer,Vehicle,Driver,Delay,Duration\n";
+<div>${t.loadType||""}</div>
 
-const limit=getDateLimit();
+<div>${t.requestedBy||""}</div>
 
-tasksData
-.filter(t=>t.status==="completed")
-.filter(t=>t.completedTime>=limit)
-.forEach(t=>{
+<div>${t.acceptedBy||""}</div>
 
-let delay=minutes(t.acceptedTime-t.created);
-let dur=minutes(t.completedTime-t.acceptedTime);
+<div>${formatTime(t.created)}</div>
 
-csv+=`${t.trailer},${t.acceptedBy},${t.driver},${delay},${dur}\n`;
+<div>${formatTime(t.acceptedTime)}</div>
 
-});
+<div>${formatTime(t.completedTime)}</div>
 
-let blob=new Blob([csv]);
-let url=URL.createObjectURL(blob);
+`
 
-let a=document.createElement("a");
-a.href=url;
-a.download="shunt-report.csv";
-a.click();
+div.appendChild(row)
 
-}
+})
 
-function resetShunters(){
-
-if(confirm("Reset all shunters?")){
-db.ref("shunters").remove();
-}
-
-}
-
-function clearPower(){
-
-if(confirm("Clear all power connections?")){
-db.ref("powerConnections").remove();
-}
-
-}
-
-loadAll();
+})
 
 </script>
 
