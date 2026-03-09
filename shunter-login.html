@@ -10,18 +10,22 @@
 <h1>Shunter Login</h1>
 
 <label>Vehicle</label><br>
+
 <select id="vehicle">
-  <option value="">Select vehicle</option>
-  <option value="S1">S1</option>
-  <option value="S2">S2</option>
-  <option value="S3">S3</option>
-  <option value="S4">S4</option>
+<option value="">Select vehicle</option>
+
+<option value="OZS">OZS</option>
+<option value="MYJ">MYJ</option>
+<option value="XSH">XSH</option>
+<option value="TZK">TZK</option>
+<option value="SPARE">SPARE</option>
+
 </select>
 
 <br><br>
 
 <label>Driver name</label><br>
-<input id="driver" placeholder="e.g. Dave">
+<input id="driver" placeholder="Driver name">
 
 <br><br>
 
@@ -34,63 +38,69 @@
 <script src="config.js"></script>
 
 <script>
+
 function login(){
 
-  const btn = document.getElementById("loginBtn");
-  btn.disabled = true;
-  btn.innerText = "Logging in...";
+const btn=document.getElementById("loginBtn")
 
-  const vehicle = (document.getElementById("vehicle").value || "").trim();
-  const driver = (document.getElementById("driver").value || "").trim();
+btn.disabled=true
+btn.innerText="Logging in..."
 
-  if(!vehicle || !driver){
-    alert("Select a vehicle and enter driver name");
-    btn.disabled = false;
-    btn.innerText = "Login";
-    return;
-  }
+const vehicle=document.getElementById("vehicle").value
+const driver=document.getElementById("driver").value
 
-  // Lock vehicle so only one login per vehicle at a time
-  const ref = db.ref("shunters/" + vehicle);
+if(!vehicle || !driver){
 
-  ref.transaction(current => {
+alert("Select vehicle and enter driver")
 
-    // if someone already logged in and hasn't been cleared, block
-    if(current && current.isLoggedIn){
-      return; // abort
-    }
+btn.disabled=false
+btn.innerText="Login"
 
-    return {
-      driver: driver,
-      status: "available",
-      isLoggedIn: true,
-      loginTime: Date.now()
-    };
-
-  }, (error, committed) => {
-
-    if(error){
-      console.error(error);
-      alert("Login failed");
-      btn.disabled = false;
-      btn.innerText = "Login";
-      return;
-    }
-
-    if(!committed){
-      alert(vehicle + " is already logged in on another device.");
-      btn.disabled = false;
-      btn.innerText = "Login";
-      return;
-    }
-
-    localStorage.setItem("vehicle", vehicle);
-    localStorage.setItem("driver", driver);
-
-    window.location.href = "shunter.html";
-  });
+return
 
 }
+
+const ref=db.ref("shunters/"+vehicle)
+
+ref.transaction(current=>{
+
+if(current && current.isLoggedIn){
+
+return
+
+}
+
+return{
+
+driver:driver,
+status:"available",
+isLoggedIn:true,
+loginTime:Date.now()
+
+}
+
+},(error,committed)=>{
+
+if(!committed){
+
+alert(vehicle+" already logged in")
+
+btn.disabled=false
+btn.innerText="Login"
+
+return
+
+}
+
+localStorage.setItem("vehicle",vehicle)
+localStorage.setItem("driver",driver)
+
+window.location.href="shunter.html"
+
+})
+
+}
+
 </script>
 
 </body>
