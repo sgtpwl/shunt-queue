@@ -20,9 +20,9 @@
 
 <hr>
 
-<h2>Shunter Status</h2>
+<h2>Live Yard Dashboard</h2>
 
-<div id="shunterStatus"></div>
+<div id="dashboard"></div>
 
 <hr>
 
@@ -108,6 +108,8 @@ localStorage.clear()
 window.location.href="index.html"
 }
 
+/* ---------- TASK INPUT SWITCH ---------- */
+
 function toggleTaskInputs(){
 
 const type=document.getElementById("taskType").value
@@ -116,6 +118,8 @@ document.getElementById("moveFields").style.display=(type==="move")?"block":"non
 document.getElementById("powerFields").style.display=(type==="power")?"block":"none"
 
 }
+
+/* ---------- BAY LIST ---------- */
 
 function populateBays(){
 
@@ -139,7 +143,45 @@ bay.appendChild(o)
 
 populateBays()
 
+/* ---------- LIVE DASHBOARD ---------- */
+
+db.ref("shunters").on("value",snap=>{
+
+const div=document.getElementById("dashboard")
+
+div.innerHTML=""
+
+snap.forEach(child=>{
+
+const s=child.val()
+
+let icon="🟢"
+
+if(s.status==="moving") icon="🟡"
+if(s.status==="power") icon="🔵"
+if(s.status==="break") icon="🔴"
+
+let row=document.createElement("div")
+
+row.style.padding="8px"
+
+row.innerHTML=`<b>${child.key}</b> (${s.driver}) ${icon} ${s.status}`
+
+div.appendChild(row)
+
+})
+
+})
+
 /* ---------- QUEUE ---------- */
+
+let currentShunters={}
+
+db.ref("shunters").on("value",snap=>{
+
+currentShunters=snap.val() || {}
+
+})
 
 db.ref("tasks").on("value",snap=>{
 
@@ -156,11 +198,15 @@ all.sort((a,b)=>(a.position||0)-(b.position||0))
 const tasks=all.filter(t=>t.status!=="completed")
 
 const div=document.getElementById("tasks")
+
 div.innerHTML=""
+
+const shunterCount=Object.keys(currentShunters).length
 
 tasks.forEach((t,i)=>{
 
 const row=document.createElement("div")
+
 row.className="managerRow"
 
 row.innerHTML=`
@@ -182,7 +228,9 @@ div.appendChild(row)
 
 const controls=document.getElementById("controls-"+t.id)
 
-if(t.status==="waiting" && i>=4){
+/* dynamic lock based on shunter count */
+
+if(t.status==="waiting" && i>=shunterCount){
 
 const up=document.createElement("button")
 up.innerText="▲"
@@ -196,33 +244,6 @@ controls.appendChild(up)
 controls.appendChild(down)
 
 }
-
-})
-
-})
-
-/* ---------- SHUNTER STATUS ---------- */
-
-db.ref("shunters").on("value",snap=>{
-
-const div=document.getElementById("shunterStatus")
-div.innerHTML=""
-
-snap.forEach(child=>{
-
-const s=child.val()
-
-let icon="🟢"
-
-if(s.status==="moving") icon="🟡"
-if(s.status==="power") icon="🔵"
-if(s.status==="break") icon="🔴"
-
-let row=document.createElement("div")
-
-row.innerHTML=`<b>${child.key}</b> (${s.driver}) ${icon} ${s.status}`
-
-div.appendChild(row)
 
 })
 
