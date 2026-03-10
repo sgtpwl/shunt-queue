@@ -6,18 +6,61 @@ let vehicle = localStorage.getItem("vehicle")
 let driver = localStorage.getItem("driver")
 
 db.ref("activityLog").push({
-
 vehicle:vehicle || "",
 driver:driver || "",
 type:type,
 trailer:trailer,
 time:Date.now()
+})
+
+}
+
+/* ---------- ADD TASK ---------- */
+
+function addTask(button){
+
+let trailer=document.getElementById("trailer")?.value || ""
+let from=document.getElementById("from")?.value || ""
+let to=document.getElementById("to")?.value || ""
+let bay=document.getElementById("bay")?.value || ""
+let loadType=document.getElementById("loadType")?.value || ""
+let type=document.getElementById("taskType")?.value || "move"
+
+let requestedBy=localStorage.getItem("userName") || "Unknown"
+
+db.ref("tasks").once("value").then(snapshot=>{
+
+let pos=snapshot.numChildren()+1
+
+let task={
+
+trailer:trailer,
+from:from,
+to:to,
+bay:bay,
+loadType:loadType,
+requestedBy:requestedBy,
+position:pos,
+created:Date.now(),
+status:"waiting"
+
+}
+
+if(type==="move"){
+task.type="Move Trailer"
+}
+
+if(type==="power"){
+task.type="Provide Power"
+}
+
+db.ref("tasks").push(task)
 
 })
 
 }
 
-/* ACCEPT TASK */
+/* ---------- ACCEPT TASK ---------- */
 
 function acceptTask(id){
 
@@ -29,12 +72,10 @@ db.ref("tasks/"+id).once("value").then(snap=>{
 let t = snap.val()
 
 db.ref("tasks/"+id).update({
-
 acceptedBy:vehicle,
 acceptedByDriver:driver,
 acceptedTime:Date.now(),
 status:"accepted"
-
 })
 
 logActivity("ACCEPT",t.trailer)
@@ -43,7 +84,7 @@ logActivity("ACCEPT",t.trailer)
 
 }
 
-/* COMPLETE TASK */
+/* ---------- COMPLETE TASK ---------- */
 
 function completeTask(id){
 
@@ -61,10 +102,8 @@ return
 }
 
 db.ref("tasks/"+id).update({
-
 completedTime:Date.now(),
 status:"completed"
-
 })
 
 logActivity("COMPLETE",t.trailer)
@@ -73,7 +112,7 @@ logActivity("COMPLETE",t.trailer)
 
 }
 
-/* BREAK */
+/* ---------- BREAK ---------- */
 
 function startBreak(){
 
