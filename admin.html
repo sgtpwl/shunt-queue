@@ -34,6 +34,23 @@
 
 <hr>
 
+<h2>⚠ Stuck Jobs Monitor</h2>
+
+<div class="queueHeader">
+
+<div>Trailer</div>
+<div>Job</div>
+<div>Status</div>
+<div>Time</div>
+<div>Shunter</div>
+<div>Action</div>
+
+</div>
+
+<div id="stuckJobs"></div>
+
+<hr>
+
 <h2>Completed Jobs</h2>
 
 <div>
@@ -97,7 +114,6 @@ loadCompleted()
 function resetVehicle(vehicle){
 
 db.ref("shunters/"+vehicle).remove()
-
 alert(vehicle+" reset")
 
 }
@@ -105,7 +121,6 @@ alert(vehicle+" reset")
 function resetAll(){
 
 db.ref("shunters").remove()
-
 alert("All shunters reset")
 
 }
@@ -113,20 +128,98 @@ alert("All shunters reset")
 function resetPower(){
 
 db.ref("powerConnections").remove()
-
 alert("Power connections cleared")
 
 }
 
+/* ---------- STUCK JOB MONITOR ---------- */
+
+function loadStuckJobs(){
+
+db.ref("tasks").on("value",snap=>{
+
+let div=document.getElementById("stuckJobs")
+div.innerHTML=""
+
+let now=Date.now()
+
+snap.forEach(child=>{
+
+let t=child.val()
+let id=child.key
+
+if(t.status==="completed") return
+
+let row=null
+
+/* waiting too long */
+
+if(t.status==="waiting"){
+
+let mins=Math.floor((now-(t.created||0))/60000)
+
+if(mins>15){
+
+row=document.createElement("div")
+row.className="managerRow"
+
+row.innerHTML=`
+
+<div>${t.trailer}</div>
+<div>${t.type}</div>
+<div>⚠ Waiting</div>
+<div>${mins} min</div>
+<div>-</div>
+<div></div>
+
+`
+
+}
+
+}
+
+/* accepted too long */
+
+if(t.status==="accepted"){
+
+let mins=Math.floor((now-(t.acceptedTime||0))/60000)
+
+if(mins>30){
+
+row=document.createElement("div")
+row.className="managerRow"
+
+row.innerHTML=`
+
+<div>${t.trailer}</div>
+<div>${t.type}</div>
+<div>⚠ Stuck</div>
+<div>${mins} min</div>
+<div>${t.acceptedBy}</div>
+<div><button onclick="returnToQueue('${id}')">Return</button></div>
+
+`
+
+}
+
+}
+
+if(row) div.appendChild(row)
+
+})
+
+})
+
+}
+
+/* ---------- COMPLETED JOBS ---------- */
 
 function loadCompleted(){
 
 db.ref("tasks").once("value").then(snap=>{
 
 let div=document.getElementById("completed")
-
 div.innerHTML=""
-
 csvData=[]
 
 let now=Date.now()
@@ -157,7 +250,6 @@ let acceptedTime=new Date(t.acceptedTime||0).toLocaleTimeString()
 let completedTime=new Date(t.completedTime||0).toLocaleTimeString()
 
 let row=document.createElement("div")
-
 row.className="managerRow"
 
 row.innerHTML=`
@@ -198,6 +290,7 @@ duration
 
 }
 
+/* ---------- CSV DOWNLOAD ---------- */
 
 function downloadCSV(){
 
@@ -208,33 +301,28 @@ csv+=r.join(",")+"\n"
 })
 
 let blob=new Blob([csv],{type:"text/csv"})
-
 let url=URL.createObjectURL(blob)
 
 let a=document.createElement("a")
-
 a.href=url
 a.download="completed_jobs.csv"
-
 a.click()
 
 }
 
-
+/* ---------- ACTIVITY LOG ---------- */
 
 function downloadActivity(range){
 
 db.ref("activityLog").once("value").then(snap=>{
 
-let now = Date.now()
-
+let now=Date.now()
 let rows=[]
 
 snap.forEach(child=>{
 
-let a = child.val()
-
-let age = now - a.time
+let a=child.val()
+let age=now-a.time
 
 if(range=="today" && age>86400000) return
 if(range=="24h" && age>86400000) return
@@ -258,14 +346,11 @@ csv+=r.join(",")+"\n"
 })
 
 let blob=new Blob([csv],{type:"text/csv"})
-
 let url=URL.createObjectURL(blob)
 
 let a=document.createElement("a")
-
 a.href=url
 a.download="activity_log.csv"
-
 a.click()
 
 })
@@ -273,6 +358,7 @@ a.click()
 }
 
 loadCompleted()
+loadStuckJobs()
 
 </script>
 
